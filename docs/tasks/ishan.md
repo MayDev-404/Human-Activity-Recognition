@@ -9,6 +9,6 @@ Order: M2.1, M2.2, M2.3, M2.4, M2.5, M2.6, M2.7, M2.8.
 | M2.3 | Trainer | Done | ishan/trainer |
 | M2.4 | Training script | Done | ishan/train-script |
 | M2.5 | Model 2: 1D-CNN (code, tests, preliminary run, notes) | Done | ishan/cnn1d |
-| M2.6 | Results table, curves, same-machine profiling, observations | In progress | ishan/results-table |
+| M2.6 | Results table, curves, same-machine profiling, observations | Done | ishan/results-table, ishan/observations |
 | M2.7 | 5 literature rows | Done | ishan/lit |
 | M2.8 | Evaluation protocol section and CNN risks | Done | ishan/report-eval |
