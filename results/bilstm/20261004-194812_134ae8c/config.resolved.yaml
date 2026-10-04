@@ -1,0 +1,42 @@
+seed: 42
+data:
+  augment: false
+  representation: raw
+train:
+  batch_size: 64
+  max_epochs: 50
+  optimizer: adam
+  lr: 0.001
+  weight_decay: 0.0
+  patience: 10
+  monitor: val_macro_f1
+  mode: max
+  grad_clip_norm: 1.0
+  device: auto
+eval:
+  latency_batch_sizes:
+  - 1
+  - 256
+  latency_warmup: 20
+  latency_iters: 200
+  latency_threads: 1
+name: bilstm
+owner: M3
+model:
+  target: har.models.birnn.BiRNN
+  params:
+    in_channels: 9
+    hidden: 64
+    num_layers: 2
+    cell: lstm
+    bidirectional: true
+    dropout: 0.3
+    pooling: last
+    n_classes: 6
+protocol_override: false
+run:
+  config_file: configs/bilstm.yaml
+  smoke: false
+  no_test: false
+  subset: null
+  tag: null
