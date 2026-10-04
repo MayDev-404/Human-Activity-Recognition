@@ -1,14 +1,18 @@
-"""Tests for har.eval.metrics (and har.eval.plots once it exists)."""
+"""Tests for har.eval.metrics and har.eval.plots."""
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from har.data.constants import ACTIVITY_NAMES
 from har.eval.metrics import classification_report_text, compute_metrics
+from har.eval.plots import display_name, plot_confusion, plot_history
+
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
 # Toy example, worked out by hand. Classes 3, 4 and 5 never occur.
 #   class 0: TP 1, FP 1, FN 1 -> P 1/2, R 1/2, F1 1/2
@@ -77,3 +81,35 @@ def test_classification_report_lists_every_class() -> None:
     for name in ACTIVITY_NAMES:
         assert name in text
     assert "macro avg" in text
+
+
+def _is_png(path: Path) -> bool:
+    return path.is_file() and path.read_bytes()[:8] == PNG_MAGIC
+
+
+@pytest.mark.parametrize("normalize", [True, False])
+def test_plot_confusion_writes_a_png(tmp_path: Path, normalize: bool) -> None:
+    cm = compute_metrics(TOY_TRUE, TOY_PRED, ACTIVITY_NAMES)["confusion"]   # rows 3..5 are empty
+    out = plot_confusion(cm, ACTIVITY_NAMES, tmp_path / "sub" / "cm.png", normalize=normalize, title="toy")
+    assert out == tmp_path / "sub" / "cm.png" and _is_png(out)
+
+
+def test_plot_confusion_rejects_a_matrix_of_the_wrong_size(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="shape"):
+        plot_confusion(np.zeros((5, 5), dtype=int), ACTIVITY_NAMES, tmp_path / "cm.png")
+
+
+def test_plot_history_writes_a_png(tmp_path: Path) -> None:
+    history = [
+        {"epoch": e, "train_loss": 1.0 / e, "train_acc": 0.5, "val_loss": 1.2 / e, "val_acc": 0.5,
+         "val_macro_f1": f1, "lr": 1e-3, "epoch_time_s": 0.1}
+        for e, f1 in enumerate([0.5, 0.7, 0.65], start=1)
+    ]
+    assert _is_png(plot_history(history, tmp_path / "curves.png", title="toy"))
+    assert _is_png(plot_history(history[:1], tmp_path / "one_epoch.png"))
+    with pytest.raises(ValueError, match="empty"):
+        plot_history([], tmp_path / "none.png")
+
+
+def test_display_name() -> None:
+    assert display_name("WALKING_UPSTAIRS") == "Walking upstairs"
