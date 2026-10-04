@@ -28,9 +28,9 @@
 
 ## Risks: Model 3 (M3)
 
-<!-- M3 (M3.9): revisit after the BiLSTM and GRU runs. -->
-- Recurrence over 128 steps is sequential, so the BiLSTM and GRU are likely slower than the CNN; costs are compared on one machine in Phase 3.
-- Static postures show almost no body acceleration, so the recurrent models must separate them using the gravity channels.
+<!-- M3: from runs bilstm/20261004-194812 and gru/20261004-194905. -->
+- Static postures: 181 of 254 BiLSTM test errors are SITTING/STANDING, which only the gravity channels separate.
+- Cost: at batch size 1 on one CPU thread the GRU (6.225 ms) is slower than the BiLSTM (0.985 ms) because PyTorch accelerates only the LSTM kernel.
 
 ## Shared risks
 
