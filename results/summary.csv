@@ -1,0 +1,2 @@
+model,run_by,representation,params,val_acc,val_macro_f1,test_acc,test_macro_f1,best_epoch,train_time_s,cpu_latency_bs1_ms,hardware,runs,run_id
+cnn1d,Ishan Abhijit Saraf,raw,197702,0.9662813102119461,0.9697262820393311,0.9389209365456397,0.9405870125262137,9,7.9206764999980805,0.4844810000213329,"GPU NVIDIA GeForce RTX 4060 Laptop GPU, CPU AMD Ryzen 7 7840HS w/ Radeon 780M Graphics",1,20261004-185204_9466717

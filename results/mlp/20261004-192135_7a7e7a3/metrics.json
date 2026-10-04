@@ -1,0 +1,257 @@
+{
+  "model": "mlp",
+  "run_id": "20261004-192135_7a7e7a3",
+  "git_sha": "7a7e7a3",
+  "git_dirty": false,
+  "run_by": "Mayank Kejariwal",
+  "status": "preliminary, untuned, single seed",
+  "representation": "features",
+  "params_trainable": 178310,
+  "model_size_mb": 0.683135986328125,
+  "best_epoch": 10,
+  "epochs_run": 20,
+  "train_time_s": 4.63949169999978,
+  "mean_epoch_time_s": 0.23175994499979424,
+  "val": {
+    "accuracy": 0.9494219653179191,
+    "macro_f1": 0.9505338781992201,
+    "per_class": {
+      "WALKING": {
+        "precision": 0.9657320872274143,
+        "recall": 0.9779179810725552,
+        "f1": 0.9717868338557993,
+        "support": 317
+      },
+      "WALKING_UPSTAIRS": {
+        "precision": 0.9818181818181818,
+        "recall": 0.9342560553633218,
+        "f1": 0.9574468085106383,
+        "support": 289
+      },
+      "WALKING_DOWNSTAIRS": {
+        "precision": 0.9446494464944649,
+        "recall": 0.9846153846153847,
+        "f1": 0.9642184557438794,
+        "support": 260
+      },
+      "SITTING": {
+        "precision": 0.9193548387096774,
+        "recall": 0.9047619047619048,
+        "f1": 0.912,
+        "support": 378
+      },
+      "STANDING": {
+        "precision": 0.9238578680203046,
+        "recall": 0.9238578680203046,
+        "f1": 0.9238578680203046,
+        "support": 394
+      },
+      "LAYING": {
+        "precision": 0.9683972911963883,
+        "recall": 0.9794520547945206,
+        "f1": 0.9738933030646992,
+        "support": 438
+      }
+    },
+    "confusion": [
+      [
+        310,
+        0,
+        7,
+        0,
+        0,
+        0
+      ],
+      [
+        11,
+        270,
+        8,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        4,
+        256,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        342,
+        21,
+        14
+      ],
+      [
+        0,
+        0,
+        0,
+        30,
+        364,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        9,
+        429
+      ]
+    ]
+  },
+  "test": {
+    "accuracy": 0.9385816084153377,
+    "macro_f1": 0.9387542540042847,
+    "per_class": {
+      "WALKING": {
+        "precision": 0.9180633147113594,
+        "recall": 0.9939516129032258,
+        "f1": 0.9545014520813165,
+        "support": 496
+      },
+      "WALKING_UPSTAIRS": {
+        "precision": 0.9663677130044843,
+        "recall": 0.9150743099787686,
+        "f1": 0.9400218102508179,
+        "support": 471
+      },
+      "WALKING_DOWNSTAIRS": {
+        "precision": 0.9630541871921182,
+        "recall": 0.930952380952381,
+        "f1": 0.9467312348668281,
+        "support": 420
+      },
+      "SITTING": {
+        "precision": 0.903420523138833,
+        "recall": 0.9144602851323829,
+        "f1": 0.9089068825910931,
+        "support": 491
+      },
+      "STANDING": {
+        "precision": 0.8929889298892989,
+        "recall": 0.9097744360902256,
+        "f1": 0.9013035381750466,
+        "support": 532
+      },
+      "LAYING": {
+        "precision": 0.9980732177263969,
+        "recall": 0.9646182495344506,
+        "f1": 0.9810606060606061,
+        "support": 537
+      }
+    },
+    "confusion": [
+      [
+        493,
+        0,
+        3,
+        0,
+        0,
+        0
+      ],
+      [
+        28,
+        431,
+        12,
+        0,
+        0,
+        0
+      ],
+      [
+        16,
+        13,
+        391,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        2,
+        0,
+        449,
+        39,
+        1
+      ],
+      [
+        0,
+        0,
+        0,
+        48,
+        484,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        19,
+        518
+      ]
+    ]
+  },
+  "latency": {
+    "cpu_bs1": {
+      "mean_ms": 0.07767499999317806,
+      "p50_ms": 0.07619999814778566,
+      "p95_ms": 0.08311000710818917,
+      "batch_size": 1,
+      "device": "cpu",
+      "threads": 1,
+      "warmup": 20,
+      "iters": 200
+    },
+    "cpu_bs256": {
+      "mean_ms": 0.8079339999676449,
+      "p50_ms": 0.7836999939172529,
+      "p95_ms": 0.9111099941947031,
+      "batch_size": 256,
+      "device": "cpu",
+      "threads": 1,
+      "warmup": 20,
+      "iters": 200
+    },
+    "device_bs1": {
+      "mean_ms": 0.25269599951570854,
+      "p50_ms": 0.2310999989276752,
+      "p95_ms": 0.3403599999728612,
+      "batch_size": 1,
+      "device": "cuda",
+      "threads": null,
+      "warmup": 20,
+      "iters": 200
+    }
+  },
+  "hardware": {
+    "python": "3.12.10",
+    "torch": "2.14.1+cu130",
+    "os": "Windows-11-10.0.26200-SP0",
+    "cpu": "AMD Ryzen 7 7840HS w/ Radeon 780M Graphics",
+    "processor": "AMD64 Family 25 Model 116 Stepping 1, AuthenticAMD",
+    "cpu_count": 16,
+    "device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "val_subjects": [
+    3,
+    15,
+    19,
+    22,
+    28,
+    29
+  ],
+  "protocol_override": false,
+  "smoke": false,
+  "tag": null,
+  "counts": {
+    "train": 5276,
+    "val": 2076,
+    "test": 2947
+  }
+}
