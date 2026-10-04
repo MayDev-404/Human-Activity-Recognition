@@ -1,0 +1,8 @@
+{
+  "seed": 42,
+  "n_val_subjects": 6,
+  "val_subjects": [3, 15, 19, 22, 28, 29],
+  "train_subjects": [1, 5, 6, 7, 8, 11, 14, 16, 17, 21, 23, 25, 26, 27, 30],
+  "test_subjects": [2, 4, 9, 10, 12, 13, 18, 20, 24],
+  "note": "Selected once; do not regenerate."
+}
