@@ -1,0 +1,22 @@
+# Shared training and evaluation protocol for every model (BUILD_SPEC 5.7 and 8.1).
+# Changes need agreement from all three members. Model configs must not contain
+# `train` or `seed` keys; har.utils.config.load_config enforces this.
+seed: 42
+data:
+  augment: false
+train:
+  batch_size: 64
+  max_epochs: 50
+  optimizer: adam
+  lr: 0.001
+  weight_decay: 0.0
+  patience: 10
+  monitor: val_macro_f1
+  mode: max
+  grad_clip_norm: 1.0
+  device: auto
+eval:
+  latency_batch_sizes: [1, 256]
+  latency_warmup: 20
+  latency_iters: 200
+  latency_threads: 1

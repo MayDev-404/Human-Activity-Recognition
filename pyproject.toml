@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "har"
+version = "0.1.0"
+description = "Comparative evaluation of deep learning architectures for human activity recognition on UCI HAR (ICT 4442 mini project)"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "needs_data: needs the UCI HAR dataset in data/raw/ (skipped automatically when it is missing)",
+]

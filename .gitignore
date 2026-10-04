@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+dist/
+wheels/
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
+# Note: "build/" is deliberately NOT ignored (it would also hide paths we may want later);
+# report/build/ is ignored explicitly below.
+
+# Environments and secrets
+.venv/
+venv/
+.env
+
+# Editors and OS
+.vscode/
+.idea/
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
+~$*
+
+# Project
+# Leading slash: only the top-level dataset folder, so src/har/data/ stays tracked.
+/data/
+*.pt
+*.pth
+results/_smoke/
+*.local.yaml
+report/build/
+
+# Synopsis PDF (contains registration numbers; kept out of the public repo)
+ICT4442_Synopsis_HAR.pdf
