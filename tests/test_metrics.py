@@ -10,7 +10,7 @@ import pytest
 
 from har.data.constants import ACTIVITY_NAMES
 from har.eval.metrics import classification_report_text, compute_metrics
-from har.eval.plots import display_name, plot_confusion, plot_history
+from har.eval.plots import display_name, plot_confusion, plot_history, plot_val_curves
 
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
@@ -109,6 +109,16 @@ def test_plot_history_writes_a_png(tmp_path: Path) -> None:
     assert _is_png(plot_history(history[:1], tmp_path / "one_epoch.png"))
     with pytest.raises(ValueError, match="empty"):
         plot_history([], tmp_path / "none.png")
+
+
+def test_plot_val_curves_writes_a_png_and_caps_the_series(tmp_path: Path) -> None:
+    curves = {"cnn1d": [{"epoch": 1, "val_macro_f1": 0.9}, {"epoch": 2, "val_macro_f1": 0.95}],
+              "mlp": [{"epoch": 1, "val_macro_f1": 0.93}]}
+    assert _is_png(plot_val_curves(curves, tmp_path / "curves.png", slots={"cnn1d": 1, "mlp": 0}))
+    with pytest.raises(ValueError, match="at most"):
+        plot_val_curves(curves, tmp_path / "too_many.png", slots={"cnn1d": 8, "mlp": 0})
+    with pytest.raises(ValueError, match="no curves"):
+        plot_val_curves({}, tmp_path / "none.png")
 
 
 def test_display_name() -> None:
