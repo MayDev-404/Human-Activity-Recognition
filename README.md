@@ -16,8 +16,8 @@ We compare four deep learning model families for human activity recognition from
 | ID | Member | GitHub | Owns |
 |---|---|---|---|
 | M1 | Mayank Kejariwal | [MayDev-404](https://github.com/MayDev-404) | MLP, Transformer, engineered-feature pipeline, repository scaffold, report assembly |
-| M2 | Ishan Abhijit Saraf | (to be added) | 1D-CNN, shared evaluation harness (metrics, trainer, train script, profiling, results table) |
-| M3 | Addyan Kumar | (to be added) | BiLSTM and GRU ablation, dataset download, raw-signal loading, normalisation, validation split, augmentation |
+| M2 | Ishan Abhijit Saraf | [IshanCodes21](https://github.com/IshanCodes21) | 1D-CNN, shared evaluation harness (metrics, trainer, train script, profiling, results table) |
+| M3 | Addyan Kumar | [Addhyanitis](https://github.com/Addhyanitis) | BiLSTM and GRU ablation, dataset download, raw-signal loading, normalisation, validation split, augmentation |
 
 Each member commits their own work under their own GitHub account. The full plan and file ownership are in [docs/BUILD_SPEC.md](docs/BUILD_SPEC.md), and task status is in [docs/tasks/](docs/tasks/).
 
