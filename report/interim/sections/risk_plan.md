@@ -7,8 +7,8 @@
 
 ## Remaining work
 
-<!-- M1: revisit after the interim runs (e.g. if the Transformer stretch run happens). -->
-- Train Model 4 (Transformer) under the shared protocol; report it even if weak.
+<!-- M1: updated after the MLP and Transformer preliminary runs. -->
+- All four models are implemented and have one preliminary run; no new models remain.
 - Tune all models on validation only, with an equal budget per model.
 - Final runs with seeds 42, 43 and 44 (mean and standard deviation).
 - Cost comparison (parameters, training time, CPU latency) on one machine.
@@ -16,8 +16,8 @@
 
 ## Risks: Model 1 and 4 (M1)
 
-<!-- M1: update with what the MLP run actually showed. -->
-- Transformer data hunger: 15 training subjects is little data for self-attention; mitigated by a small pre-norm model with dropout (convolutional stem as an optional ablation).
+<!-- M1: from runs mlp/20261004-192135 and transformer/20261004-192550. -->
+- Transformer: its run drops sharply from validation to test (largest error: SITTING as STANDING), possibly too little data for self-attention; any fix is chosen on validation only.
 - MLP results mix architecture with the authors' engineered features; we state this when comparing it with raw-signal models.
 
 ## Risks: Model 2 (M2)
@@ -45,7 +45,7 @@
 
 | Dates | Milestone | Owner |
 |---|---|---|
-| 5 to 12 Oct | Model 4 trained; tuning of all models on validation | M1 (Model 4); each owner tunes their model |
+| 5 to 12 Oct | Tuning of all four models on validation (equal budget) | Each owner tunes their model |
 | 13 to 19 Oct | Final 3-seed runs, comparison table, same-machine profiling | Each owner; M2 table and profiling |
 | 20 to 25 Oct | Error analysis; Part C draft (one methodology subsection per owner) | All |
 | 26 to 29 Oct | Presentation and viva | All |
