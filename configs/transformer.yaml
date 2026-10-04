@@ -1,0 +1,8 @@
+name: transformer
+owner: M1
+data:
+  representation: raw
+model:
+  target: har.models.transformer.TransformerHAR
+  params: {in_channels: 9, seq_len: 128, d_model: 64, nhead: 4, num_layers: 3,
+           dim_feedforward: 256, dropout: 0.1, n_classes: 6}
