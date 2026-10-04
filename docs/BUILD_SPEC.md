@@ -1052,6 +1052,8 @@ Output: `report/build/ICT4442_Interim_Report_HAR.docx` and `.pdf` (gitignored; s
 
 ### 10.2 Builder behaviour (`report/build_interim_report.py`, M1)
 
+**Format decision (4 Oct 2026, M1), which overrides the steps below where they differ:** the report keeps the template's Part B form. The heading reads `PART B : INTERIM REPORT`; the template's own headings, label lines and three tables stay; section text goes beneath them as plain paragraphs and bullets in the template's fonts (10.5 pt text, the template's table size). The only additions are Fig. 1 and Fig. 2 with captions. There are no table captions, no added tables (markdown tables in section files become bullets; the commit summary becomes one sentence with per-member commits and merged PRs), no sub-headings and no reference list (so no `[n]` markers in Table I).
+
 Inputs: the template docx, `report/interim/meta.yaml`, `configs/team.yaml`, `report/interim/members.local.yaml`, `docs/lit/*.md`, `report/interim/sections/*.md`, `results/summary.csv`, `docs/tasks/*.md`, `docs/contribution_log.md`, figures from `docs/figures/` and `results/figures/`.
 
 `meta.yaml`:

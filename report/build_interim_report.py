@@ -6,8 +6,11 @@
 
 Inputs (BUILD_SPEC 10.2 and 10.3): the official template, report/interim/meta.yaml, configs/team.yaml,
 report/interim/members.local.yaml (gitignored), docs/lit/<member>.md, report/interim/sections/*.md,
-results/summary.csv, docs/tasks/<member>.md, docs/contribution_log.md and two figures. Every number in
-the report comes from results/summary.csv. Output: report/build/ICT4442_Interim_Report_HAR.docx
+results/summary.csv, docs/tasks/<member>.md, docs/contribution_log.md and two figures. The output keeps
+the template's Part B form: its own headings, label lines and three tables, with section text as plain
+paragraphs and bullets beneath them, plus two captioned figures (no added captions, sub-headings, tables
+or reference list). Every result number comes from results/summary.csv. Output:
+report/build/ICT4442_Interim_Report_HAR.docx
 (+ .pdf via LibreOffice, or Word on Windows); report/build/ is gitignored because the cover carries
 registration numbers.
 """
@@ -44,13 +47,10 @@ from har.utils.paths import REPO_ROOT
 TEMPLATE = REPO_ROOT / "report" / "template" / "ICT_4442_Mini_Project_Report_Template.docx"
 OUTPUT_STEM = "ICT4442_Interim_Report_HAR"
 PLACEHOLDER = "FILL_ME"
-ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
 
-BODY_PT = 10
-TABLE_PT = 9
-LIT_TABLE_PT = 8
-CAPTION_PT = 8
-REFERENCE_PT = 8
+BODY_PT = 10.5          # the template's Part B text size (its label lines are 10.5 pt)
+TABLE_PT: float | None = None   # None keeps the template's own table text size
+CAPTION_PT = 8          # figure captions, as in the template's formatting notes
 FIGURE_WIDTH_IN = 3.2
 
 # Template tables, identified by the start of each header cell (never by index).
@@ -59,11 +59,7 @@ MODEL_HEADERS = ["Model", "Owner", "Status", "Preliminary Metric", "Notes"]
 CONTRIB_HEADERS = ["Member Name", "Reg. No.", "Task(s) Completed", "Signature"]
 
 SECTION_DIR = Path("report") / "interim" / "sections"
-PREPROCESSING_PARTS = [
-    ("preprocessing_raw.md", "Raw-signal pipeline"),
-    ("preprocessing_features.md", "Engineered-feature pipeline"),
-    ("evaluation_protocol.md", "Shared training and evaluation protocol"),
-]
+PREPROCESSING_FILES = ["preprocessing_raw.md", "preprocessing_features.md", "evaluation_protocol.md"]
 
 
 class BuildError(Exception):
@@ -257,15 +253,18 @@ def find_paragraph(doc: DocxDocument, prefix: str) -> Paragraph:
 class Cursor:
     """Inserts new body content one element after another, starting after ``anchor``."""
 
-    def __init__(self, doc: DocxDocument, anchor: Any, table_style_source: Table) -> None:
+    def __init__(self, doc: DocxDocument, anchor: Any) -> None:
         self.doc = doc
         self.element = anchor
-        self._tblPr = copy.deepcopy(table_style_source._tbl.tblPr)
-        self._header_cell = copy.deepcopy(table_style_source.rows[0].cells[0]._tc)
+        self._space_before = 0.0
 
     def _place(self, element: Any) -> None:
         self.element.addnext(element)
         self.element = element
+
+    def after_table(self) -> None:
+        """Leave a small gap before the next paragraph (it follows a template table)."""
+        self._space_before = 6.0
 
     def paragraph(self, text: str = "", *, style: str | None = None, size: float | None = BODY_PT,
                   align: Any = None, bold: bool | None = None, space_after: float = 4) -> Paragraph:
@@ -276,9 +275,15 @@ class Cursor:
         if align is not None:
             paragraph.alignment = align
         paragraph.paragraph_format.space_after = Pt(space_after)
+        if self._space_before:
+            paragraph.paragraph_format.space_before = Pt(self._space_before)
+            self._space_before = 0.0
         if text:
             add_inline(paragraph, text, size=size, bold=bold)
         return paragraph
+
+    def bullet(self, text: str) -> Paragraph:
+        return self.paragraph("• " + text, style="List Paragraph", space_after=2)
 
     def caption(self, text: str) -> None:
         self.paragraph(text, size=CAPTION_PT, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=3)
@@ -287,30 +292,6 @@ class Cursor:
         paragraph = self.paragraph(align=WD_ALIGN_PARAGRAPH.CENTER, space_after=2)
         paragraph.add_run().add_picture(str(path), width=Inches(FIGURE_WIDTH_IN))
         self.caption(caption)
-
-    def table(self, header: list[str], rows: list[list[str]], size: float = TABLE_PT) -> Table:
-        """A new table styled like the template tables (borders, dark header row)."""
-        table = self.doc.add_table(rows=1 + len(rows), cols=len(header))
-        self._place(table._tbl)
-        table._tbl.remove(table._tbl.tblPr)
-        table._tbl.insert(0, copy.deepcopy(self._tblPr))
-        width = int(self._tblPr.find(qn("w:tblW")).get(qn("w:w")))
-        for grid_col in table._tbl.tblGrid.findall(qn("w:gridCol")):
-            grid_col.set(qn("w:w"), str(width // len(header)))
-        for i, value in enumerate(header):
-            tc = copy.deepcopy(self._header_cell)
-            old = table.rows[0].cells[i]._tc
-            old.addnext(tc)
-            remove_element(old)
-            tc.find(qn("w:tcPr")).find(qn("w:tcW")).set(qn("w:w"), str(width // len(header)))
-            set_cell_text(_Cell(tc, table), plain(value), size)
-        for r, values in enumerate(rows, start=1):
-            for c, value in enumerate(values[: len(header)]):
-                cell = table.rows[r].cells[c]
-                cell._tc.get_or_add_tcPr().get_or_add_tcW().set(qn("w:w"), str(width // len(header)))
-                cell.paragraphs[0].text = ""
-                add_inline(cell.paragraphs[0], value, size=size)
-        return table
 
 
 # ---------------------------------------------------------------- inputs
@@ -570,21 +551,38 @@ def done_tasks(inputs: Inputs, member: Member) -> str:
     return "; ".join(f"{r[id_i]} {plain(r[task_i])}" for r in rows if r[status_i].strip().lower() == "done")
 
 
+def commit_counts(table: tuple[list[str], list[list[str]]]) -> str:
+    """``"Name (M1): 27 commits, 12 merged PRs; ..."`` from the contribution log's summary table."""
+    header, rows = table
+    columns = [h.strip().lower() for h in header]
+
+    def column(prefix: str) -> int | None:
+        return next((i for i, h in enumerate(columns) if h.startswith(prefix)), None)
+
+    member, commits, prs = column("member"), column("commits"), column("prs merged")
+    if member is None or commits is None:
+        return ""
+    def count(value: str, noun: str) -> str:
+        return f"{value} {noun}{'' if value.strip() == '1' else 's'}"
+
+    parts = []
+    for row in rows:
+        text = f"{plain(row[member])}: {count(row[commits], 'commit')}"
+        if prs is not None:
+            text += f", {count(row[prs], 'merged PR')}"
+        parts.append(text)
+    return "; ".join(parts)
+
+
 # ---------------------------------------------------------------- build steps
 
 class ReportBuilder:
     """Fills a copy of the template; ``build()`` returns the document."""
 
-    def __init__(self, inputs: Inputs, template: Path, include_references: bool = True) -> None:
+    def __init__(self, inputs: Inputs, template: Path) -> None:
         self.inputs = inputs
-        self.include_references = include_references
         self.doc = Document(str(template))
-        self.table_no = 0
         self.figure_no = 0
-
-    def next_table_caption(self, title: str) -> str:
-        self.table_no += 1
-        return f"TABLE {ROMAN[self.table_no - 1]}. {title.upper()}"
 
     def next_figure_caption(self, text: str) -> str:
         self.figure_no += 1
@@ -606,8 +604,6 @@ class ReportBuilder:
         self.models_section(meta, members, summary)
         self.contribution_section(members, repo_url)
         self.risk_section()
-        if self.include_references:
-            self.references(literature, meta)
         return self.doc
 
     # ---- cover and template surgery
@@ -646,7 +642,7 @@ class ReportBuilder:
                 break
 
     def fill_part_b_header(self, meta: dict[str, Any], members: list[Member], repo_url: str) -> None:
-        set_paragraph_text(find_paragraph(self.doc, "PART B"), "INTERIM REPORT")
+        set_paragraph_text(find_paragraph(self.doc, "PART B"), "PART B : INTERIM REPORT")
         for prefix in ("Interim report should be", "Minimum 8"):
             remove_element(find_paragraph(self.doc, prefix)._p)
         names = "; ".join(f"{m.name} ({m.reg_no})" for m in members)
@@ -664,7 +660,7 @@ class ReportBuilder:
             run.bold = False
 
     def cursor_after(self, element: Any) -> Cursor:
-        return Cursor(self.doc, element, find_table(self.doc, LIT_HEADERS))
+        return Cursor(self.doc, element)
 
     def section_blocks(self, cursor: Cursor, filename: str) -> None:
         """Insert one section file's text at the cursor (missing file: draft warning)."""
@@ -676,44 +672,34 @@ class ReportBuilder:
         self.insert_blocks(cursor, markdown_blocks(body))
 
     def insert_blocks(self, cursor: Cursor, blocks: list[Block]) -> None:
-        previous_heading = ""
+        """Plain paragraphs and bullets only, as in the template's Part B form: headings in section
+        files are dropped and each markdown table row becomes a bullet
+        ``first: second; Header3: third; ...`` (e.g. ``5 to 12 Oct: Tuning ...; Owner: All``)."""
         for block in blocks:
-            if block.kind == "heading":
-                if block.level > 1:  # level-1 headings repeat the template's section heading
-                    cursor.paragraph(block.text, bold=True, space_after=2)
-                    previous_heading = plain(block.text)
-                continue
             if block.kind == "para":
                 cursor.paragraph(block.text, align=WD_ALIGN_PARAGRAPH.JUSTIFY)
             elif block.kind == "bullet":
-                cursor.paragraph("\u2022 " + block.text, style="List Paragraph", space_after=2)
+                cursor.bullet(block.text)
             elif block.kind == "table" and block.table:
-                cursor.caption(self.next_table_caption(previous_heading or "Table"))
-                cursor.table(*block.table)
-                cursor.paragraph(space_after=2)
-            previous_heading = ""
+                header, rows = block.table
+                for row in rows:
+                    text = ": ".join(c for c in row[:2] if c)
+                    text += "".join(f"; {name}: {value}" for name, value in zip(header[2:], row[2:]) if value)
+                    cursor.bullet(text)
 
     # ---- sections
 
     def literature_section(self, literature: list[LitRow]) -> None:
         table = find_table(self.doc, LIT_HEADERS)
-        cursor = self.cursor_after(table._tbl.getprevious())
-        cursor.caption(self.next_table_caption("Literature review summary"))
-        rows = []
-        for number, row in enumerate(literature, start=1):
-            cells = (row.cells + [""] * 5)[:5]
-            cells[0] = f"{cells[0]} [{number}]"
-            rows.append(cells)
-        fill_template_table(table, rows, LIT_TABLE_PT)
+        fill_template_table(table, [(row.cells + [""] * 5)[:5] for row in literature], TABLE_PT)
         cursor = self.cursor_after(table._tbl)
-        cursor.paragraph(space_after=2)
+        cursor.after_table()
         self.section_blocks(cursor, "lit_summary.md")
 
     def preprocessing_section(self) -> None:
         label = find_paragraph(self.doc, "Description of preprocessing pipeline")
         cursor = self.cursor_after(label._p)
-        for filename, title in PREPROCESSING_PARTS:
-            cursor.paragraph(title, bold=True, space_after=2)
+        for filename in PREPROCESSING_FILES:
             self.section_blocks(cursor, filename)
         figure = self.inputs.path("docs", "figures", "class_distribution.png")
         if figure.is_file():
@@ -725,8 +711,6 @@ class ReportBuilder:
     def models_section(self, meta: dict[str, Any], members: list[Member], summary: dict[str, dict[str, str]]) -> None:
         owners = {m.id: m.name for m in members}
         table = find_table(self.doc, MODEL_HEADERS)
-        cursor = self.cursor_after(table._tbl.getprevious())
-        cursor.caption(self.next_table_caption("Models implemented so far (preliminary, untuned, single seed)"))
         rows, summaries = [], []
         for model in meta["models"]:
             front, body = load_model_notes(self.inputs, model["key"])
@@ -741,10 +725,10 @@ class ReportBuilder:
                 summaries.append((model["label"], body))
         fill_template_table(table, rows, TABLE_PT)
         cursor = self.cursor_after(table._tbl)
-        cursor.paragraph(space_after=2)
+        cursor.after_table()
         for label, body in summaries:
             text = " ".join(b.text for b in markdown_blocks(body) if b.kind in ("para", "bullet"))
-            cursor.paragraph(f"**{label}.** {text}", align=WD_ALIGN_PARAGRAPH.JUSTIFY)
+            cursor.paragraph(f"{label}: {text}", align=WD_ALIGN_PARAGRAPH.JUSTIFY)
         self.section_blocks(cursor, "observations.md")
         best = max(((k, _number(r, "val_macro_f1")) for k, r in summary.items()),
                    key=lambda kv: -1 if kv[1] is None else kv[1], default=None)
@@ -760,11 +744,9 @@ class ReportBuilder:
 
     def contribution_section(self, members: list[Member], repo_url: str) -> None:
         table = find_table(self.doc, CONTRIB_HEADERS)
-        cursor = self.cursor_after(table._tbl.getprevious())
-        cursor.caption(self.next_table_caption("Individual contribution log (signed by all members)"))
         fill_template_table(table, [[m.name, m.reg_no, done_tasks(self.inputs, m), ""] for m in members], TABLE_PT)
         cursor = self.cursor_after(table._tbl)
-        cursor.paragraph(space_after=2)
+        cursor.after_table()
         path = self.inputs.path("docs", "contribution_log.md")
         if not path.is_file():
             self.inputs.problem(f"{path} not found; run python scripts/contribution_log.py")
@@ -773,28 +755,15 @@ class ReportBuilder:
         tables = parse_tables(body)
         sha = re.search(r"HEAD\W+([0-9a-f]{7,40})", body)
         at = f" at commit {sha.group(1)[:7]}" if sha else ""
+        counts = commit_counts(tables[0]) if tables else ""
         cursor.paragraph(
-            f"Commit evidence: the table below is generated from the git history of the main branch{at} "
-            f"by scripts/contribution_log.py (full log in docs/contribution_log.md). Every commit is "
-            f"visible at {repo_url}/commits/main.", align=WD_ALIGN_PARAGRAPH.JUSTIFY)
-        if tables:
-            cursor.caption(self.next_table_caption("Commit summary per member"))
-            cursor.table(*tables[0])
+            f"Commit evidence from the git history of the main branch{at} (scripts/contribution_log.py; full log "
+            f"in docs/contribution_log.md){': ' + counts if counts else ''}. Every commit is visible at "
+            f"{repo_url}/commits/main.", align=WD_ALIGN_PARAGRAPH.JUSTIFY)
 
     def risk_section(self) -> None:
         label = find_paragraph(self.doc, "Remaining models to implement")
         self.section_blocks(self.cursor_after(label._p), "risk_plan.md")
-
-    def references(self, literature: list[LitRow], meta: dict[str, Any]) -> None:
-        body = self.doc.element.body
-        last = [el for el in body.iterchildren() if el.tag != qn("w:sectPr")][-1]
-        cursor = self.cursor_after(last)
-        cursor.paragraph("References", style="Heading 2", size=None, space_after=4)
-        entries = [row.reference for row in literature]
-        if meta.get("dataset_citation"):
-            entries.append(meta["dataset_citation"])
-        for number, entry in enumerate(entries, start=1):
-            cursor.paragraph(f"[{number}] {entry}", size=REFERENCE_PT, space_after=1)
 
 
 # ---------------------------------------------------------------- output
@@ -842,23 +811,16 @@ def count_pages(pdf: Path) -> int:
 
 
 def build(inputs: Inputs, template: Path, out_dir: Path, make_pdf: bool) -> Path:
-    """Build the docx (and PDF if possible); drop the reference list if the PDF runs over 5 pages."""
+    """Build the docx (and PDF if possible) and report the page count excluding the cover."""
     out_dir.mkdir(parents=True, exist_ok=True)
     docx_path = out_dir / f"{OUTPUT_STEM}{'_DRAFT' if inputs.draft else ''}.docx"
-    pdf = None
-    for include_references in (True, False):
-        inputs.problems.clear()
-        ReportBuilder(inputs, template, include_references).build().save(str(docx_path))
-        pdf = convert_to_pdf(docx_path) if make_pdf else None
-        if pdf is None:
-            break
+    ReportBuilder(inputs, template).build().save(str(docx_path))
+    pdf = convert_to_pdf(docx_path) if make_pdf else None
+    if pdf is not None:
         pages = count_pages(pdf) - 1  # excluding the cover page
         print(f"PDF: {pdf} ({pages} pages excluding the cover)")
-        if pages <= 5 or not include_references:
-            if not 3 <= pages <= 5:
-                print(f"WARNING: Part B should be 3 to 5 pages excluding the cover; this is {pages}.")
-            break
-        print("Over 5 pages: rebuilding without the reference list (Part B does not require it).")
+        if not 3 <= pages <= 5:
+            print(f"WARNING: Part B should be 3 to 5 pages excluding the cover; this is {pages}.")
     if make_pdf and pdf is None:
         print("No PDF converter worked (LibreOffice or Word): open the docx in Word, check it and export the PDF.")
     return docx_path
