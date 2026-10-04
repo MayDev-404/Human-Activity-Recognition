@@ -27,7 +27,7 @@ The full specification is in `docs/BUILD_SPEC.md`. Read it completely before sta
 - Logging in to `gh` does **not** change who commits are credited to: git takes the author from `user.name` and `user.email`, and the global values on this laptop are Mayank's. So at the start of every session, set the identity of the member at the keyboard **for this repository only** (never `--global`, which would change Mayank's identity everywhere): `git config user.name "<full name>"` and `git config user.email "<email verified on that member's GitHub account>"`.
 - `git push` and `gh pr create` act as the **active** `gh` account (git uses `gh` as its credential helper here). Add each account once with `gh auth login`, then `gh auth switch --user <username>` at the start of each session.
 - Re-run the three checks in step 1 and show them to the human before the first commit of the session.
-- Environment on this laptop: use the existing `.venv` (Python 3.12). Install only the **CPU** PyTorch build; Windows Smart App Control blocks the CUDA build's DLLs.
+- Environment on this laptop: use the existing `.venv` (Python 3.12) as it is. It already has CUDA PyTorch (`2.14.1+cu130`, RTX 4060 GPU; `python -c "import torch; print(torch.cuda.is_available())"` prints `True`), so do not reinstall PyTorch. Training picks the GPU automatically.
 
 ## 2. Git rules (contribution is graded from the commit history)
 
