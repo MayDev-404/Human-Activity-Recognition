@@ -22,7 +22,9 @@
 
 ## Risks: Model 2 (M2)
 
-<!-- M2 (M2.8) -->
+<!-- M2 (M2.8): from the preliminary cnn1d run; revisit after the Phase 3 seeds. -->
+- Static postures: most CNN test errors are SITTING/STANDING confusions; the error analysis tests whether the MLP's gravity-angle features separate them better.
+- Noisy selection: CNN validation macro-F1 swings between epochs, so the chosen epoch is partly chance; compare CNN settings only across the Phase 3 seeds.
 
 ## Risks: Model 3 (M3)
 
