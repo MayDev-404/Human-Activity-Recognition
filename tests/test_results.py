@@ -18,6 +18,7 @@ from har.eval.results import (
     profile_configs,
     read_history,
     select_best,
+    timing_note,
     update_readme,
     write_results_table,
     write_selected_figures,
@@ -177,6 +178,21 @@ def test_profile_configs_writes_one_row_per_model(tmp_path: Path) -> None:
 def test_hardware_label() -> None:
     assert hardware_label({"cpu": "X", "device": "cuda", "gpu": "G"}) == "GPU G, CPU X"
     assert hardware_label({"cpu": "X", "device": "cpu", "gpu": "G"}) == "CPU X"
+
+
+def test_timing_note_follows_the_hardware_of_the_rows(tmp_path: Path) -> None:
+    configs, results = _configs(tmp_path), tmp_path / "results"
+    _run(results, "cnn1d", "20261004-100000_aaa", val_f1=0.95, test_f1=0.93)
+    _run(results, "mlp", "20261004-110000_bbb", val_f1=0.96, test_f1=0.94)
+    md = write_results_table(results, configs, readme=None)["md"].read_text(encoding="utf-8")
+    assert "All runs shown report the same hardware (GPU Test GPU, CPU Test CPU)" in md
+    assert "different machines" not in md
+
+    _run(results, "zeta", "20261004-120000_ccc", val_f1=0.97, test_f1=0.95,
+         hardware={"cpu": "Other CPU", "device": "cpu", "gpu": None})
+    md = write_results_table(results, configs, readme=None)["md"].read_text(encoding="utf-8")
+    assert "measured on different machines" in md and "same hardware" not in md
+    assert timing_note([]) == ""
 
 
 def test_scripts_call_the_package_functions(tmp_path: Path) -> None:
