@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import copy
 import csv
+import json
 import math
 import os
 import re
@@ -24,6 +25,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -448,6 +450,71 @@ def load_summary(inputs: Inputs) -> dict[str, dict[str, str]]:
     return summary
 
 
+RUN_ID_TIME_RE = re.compile(r"^(\d{8}-\d{6})")
+REGENERATE = "M2 must rerun python scripts/make_results_table.py and commit the result"
+
+
+def full_runs(inputs: Inputs) -> dict[str, list[Path]]:
+    """Full run folders per model (``results/<model>/<run_id>/metrics.json``).
+
+    Smoke runs (folders starting with ``_``) and protocol-override runs are skipped: they never
+    get a row in results/summary.csv.
+    """
+    runs: dict[str, list[Path]] = {}
+    for metrics in sorted(inputs.path("results").glob("*/*/metrics.json")):
+        model_dir = metrics.parent.parent
+        if model_dir.name.startswith("_"):
+            continue
+        try:
+            if json.loads(metrics.read_text(encoding="utf-8")).get("protocol_override"):
+                continue
+        except (OSError, ValueError):
+            pass  # an unreadable metrics.json still counts as a run that needs a summary row
+        runs.setdefault(model_dir.name, []).append(metrics.parent)
+    return runs
+
+
+def run_started(run_dir: Path) -> datetime | None:
+    """Start time encoded in a run id such as ``20261004-194905_134ae8c`` (local time)."""
+    match = RUN_ID_TIME_RE.match(run_dir.name)
+    return datetime.strptime(match.group(1), "%Y%m%d-%H%M%S") if match else None
+
+
+def summary_written_at(path: Path) -> datetime:
+    """When results/summary.csv was last regenerated: the time of its last git commit, or its
+    file time if it has uncommitted changes or git cannot tell (file times change on checkout)."""
+    def git(*args: str) -> str:
+        return subprocess.run(["git", "-C", str(path.parent), *args, "--", path.name],
+                              capture_output=True, text=True, check=True).stdout.strip()
+
+    try:
+        committed, dirty = git("log", "-1", "--format=%ct"), git("status", "--porcelain")
+        if committed and not dirty:
+            return datetime.fromtimestamp(int(committed))
+    except (OSError, subprocess.CalledProcessError, ValueError):
+        pass
+    return datetime.fromtimestamp(path.stat().st_mtime)
+
+
+def check_summary_is_current(inputs: Inputs, summary: dict[str, dict[str, str]]) -> None:
+    """Refuse a stale results table: every model with a full run folder needs a summary row, and
+    summary.csv must have been regenerated after the newest run started."""
+    runs = full_runs(inputs)
+    for model, run_dirs in sorted(runs.items()):
+        if model not in summary:
+            inputs.problem(f"results/{model}/ has {len(run_dirs)} full run folder(s) but results/summary.csv "
+                           f"has no '{model}' row; {REGENERATE}")
+    path = inputs.path("results", "summary.csv")
+    started = [(t, d) for dirs in runs.values() for d in dirs if (t := run_started(d)) is not None]
+    if not path.is_file() or not started:
+        return
+    written = summary_written_at(path)
+    newest_time, newest = max(started)
+    if newest_time > written:
+        inputs.problem(f"results/summary.csv (regenerated {written:%Y-%m-%d %H:%M:%S}) is older than the newest "
+                       f"run folder results/{newest.parent.name}/{newest.name}; {REGENERATE}")
+
+
 def _number(row: dict[str, str], *names: str) -> float | None:
     for name in names:
         value = row.get(name, "")
@@ -528,6 +595,7 @@ class ReportBuilder:
         members = load_members(self.inputs)
         repo_url = resolve_repo_url(self.inputs, meta)
         summary = load_summary(self.inputs)
+        check_summary_is_current(self.inputs, summary)
         literature = load_literature(self.inputs, members)
 
         self.fill_cover(meta, members)

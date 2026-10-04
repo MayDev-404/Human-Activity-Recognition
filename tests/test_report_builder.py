@@ -7,8 +7,10 @@ never results.
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 from types import ModuleType
 
@@ -209,6 +211,44 @@ def test_final_build_refuses_missing_inputs(dummy_root: Path) -> None:
     (dummy_root / "report/interim/sections/observations.md").unlink()
     with pytest.raises(builder.BuildError, match="observations.md"):
         _build(dummy_root)
+
+
+# ---------------------------------------------------------------- stale results table guard
+
+def _run_folder(root: Path, rel_dir: str, override: bool = False) -> None:
+    run_id = rel_dir.rsplit("/", 1)[-1]
+    _write(root, f"results/{rel_dir}/metrics.json", json.dumps({"run_id": run_id, "protocol_override": override}))
+
+
+def test_run_started_parses_the_run_id() -> None:
+    assert builder.run_started(Path("20261004-194905_134ae8c")) == datetime(2026, 10, 4, 19, 49, 5)
+    assert builder.run_started(Path("not-a-run")) is None
+
+
+def test_final_build_refuses_a_model_with_runs_but_no_summary_row(dummy_root: Path) -> None:
+    _run_folder(dummy_root, "gru/20000101-000000_abc1234")  # the dummy summary has no gru row
+    with pytest.raises(builder.BuildError, match="no 'gru' row"):
+        _build(dummy_root)
+
+
+def test_final_build_refuses_a_summary_older_than_the_newest_run(dummy_root: Path) -> None:
+    _run_folder(dummy_root, "mlp/20991231-235959_abc1234")  # started after summary.csv was written
+    with pytest.raises(builder.BuildError, match="older than the newest run folder"):
+        _build(dummy_root)
+
+
+def test_current_summary_passes_and_smoke_or_override_runs_are_ignored(dummy_root: Path) -> None:
+    _run_folder(dummy_root, "mlp/20000101-000000_abc1234")
+    _run_folder(dummy_root, "_smoke/gru/20991231-235959_abc1234")
+    _run_folder(dummy_root, "gru/20991231-235959_abc1234", override=True)
+    assert _build(dummy_root).is_file()
+
+
+def test_draft_build_only_warns_about_a_stale_summary(dummy_root: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _run_folder(dummy_root, "gru/20991231-235959_abc1234")
+    _build(dummy_root, "--draft")
+    out = capsys.readouterr().out
+    assert "no 'gru' row" in out and "older than the newest run folder" in out
 
 
 def test_mismatched_literature_references_are_rejected(dummy_root: Path) -> None:
