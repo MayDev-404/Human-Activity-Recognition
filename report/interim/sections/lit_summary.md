@@ -1,0 +1,3 @@
+<!-- Report section 1, literature synthesis (M3). Budget: 2 to 3 sentences, 80 words or fewer.
+     Every figure comes from the 13 rows in docs/lit/{mayank,ishan,addyan}.md. -->
+On UCI HAR, an SVM on the 561 engineered features reaches 96% test accuracy (Anguita et al.), and deep models report 93.6% to 97.59% (Zhao et al.; Jiang and Yin). Comparisons across model families find no single winner (Hammerla et al.; Wang et al.), and published results differ in protocol: some use random rather than subject-wise splits (Dirgová Luptáková et al.). This project compares all four families under one subject-wise protocol.
