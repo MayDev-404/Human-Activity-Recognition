@@ -17,10 +17,12 @@ from matplotlib.ticker import MaxNLocator
 
 DPI = 200
 
-# Validated default palette: categorical slots 1-2 (train blue, validation orange), the blue
-# sequential ramp (steps 100, 250, 400, 550, 700) for magnitude, and recessive chrome. The
-# same chrome as the dataset figures in har.data.stats, so all report figures match.
-TRAIN_COLOR, VAL_COLOR = "#2a78d6", "#eb6834"
+# Validated default palette: categorical slots in fixed order (train blue and validation orange
+# in run curves; one slot per model in comparisons), the blue sequential ramp (steps 100, 250,
+# 400, 550, 700) for magnitude, and recessive chrome. The same chrome as the dataset figures in
+# har.data.stats, so all report figures match.
+CATEGORICAL = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948")
+TRAIN_COLOR, VAL_COLOR = CATEGORICAL[0], CATEGORICAL[1]
 SURFACE = "#ffffff"
 INK, INK_SECONDARY, INK_MUTED = "#0b0b0b", "#52514e", "#898781"
 GRID, BASELINE = "#e1e0d9", "#c3c2b7"
@@ -136,6 +138,43 @@ def plot_history(history: Sequence[dict], path: Path, title: str = "") -> Path:
                    xytext=(3, 0), textcoords="offset points", fontsize=6, color=INK_SECONDARY, va="bottom")
 
     fig.legend(fontsize=6.5, frameon=False, loc="outside upper center", ncol=2,
+               labelcolor=INK_SECONDARY, handlelength=1.5)
+    if title:
+        fig.suptitle(title, fontsize=8, color=INK, x=0.01, ha="left")
+    return _save(fig, path)
+
+
+def plot_val_curves(curves: dict[str, Sequence[dict]], path: Path, slots: dict[str, int] | None = None,
+                    title: str = "") -> Path:
+    """Save validation macro-F1 per epoch for several models on one axis as a PNG.
+
+    ``curves`` maps a model name to its history rows (``epoch``, ``val_macro_f1``). ``slots``
+    fixes each model's categorical palette slot so a model keeps its colour whichever other
+    models are shown (default: order of ``curves``). Each model's best epoch gets a larger
+    dot. Returns ``path``.
+    """
+    if not curves:
+        raise ValueError("no curves to plot")
+    slots = slots if slots is not None else {name: i for i, name in enumerate(curves)}
+    if max(slots[name] for name in curves) >= len(CATEGORICAL):
+        raise ValueError(f"at most {len(CATEGORICAL)} series; fold the rest into small multiples")
+
+    fig = Figure(figsize=(4.6, 2.8), facecolor=SURFACE, layout="constrained")
+    ax = fig.subplots()
+    _style_axes(ax)
+    for name, history in curves.items():
+        epochs = [int(r["epoch"]) for r in history]
+        f1 = [float(r["val_macro_f1"]) for r in history]
+        color = CATEGORICAL[slots[name]]
+        ax.plot(epochs, f1, color=color, label=name, linewidth=1.5, marker="o", markersize=2)
+        best = int(np.argmax(f1))
+        # Surface ring keeps the best-epoch dot legible where lines overlap.
+        ax.plot(epochs[best], f1[best], marker="o", markersize=5, color=color,
+                markeredgecolor=SURFACE, markeredgewidth=1.0, zorder=3)
+    ax.set_xlabel("Epoch", fontsize=7, color=INK_SECONDARY)
+    ax.set_ylabel("Validation macro-F1", fontsize=7, color=INK_SECONDARY)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    fig.legend(fontsize=6.5, frameon=False, loc="outside upper center", ncol=min(len(curves), 5),
                labelcolor=INK_SECONDARY, handlelength=1.5)
     if title:
         fig.suptitle(title, fontsize=8, color=INK, x=0.01, ha="left")
