@@ -8,16 +8,15 @@
 ## Remaining work
 
 <!-- M1: updated after the MLP and Transformer preliminary runs. -->
-- All four models are implemented and have one preliminary run; no new models remain.
-- Tune all models on validation only, with an equal budget per model.
+- All four models are implemented with one preliminary run each.
+- Tune all models on validation only, with equal budgets.
 - Final runs with seeds 42, 43 and 44 (mean and standard deviation).
-- Cost comparison (parameters, training time, CPU latency) on one machine.
-- Error analysis: are SITTING/STANDING and stair-direction errors shared by all architectures or specific to some?
+- Error analysis: are SITTING/STANDING and stair-direction errors shared across architectures?
 
 ## Risks: Model 1 and 4 (M1)
 
 <!-- M1: from runs mlp/20261004-192135 and transformer/20261004-192550. -->
-- Transformer: its run drops sharply from validation to test (largest error: SITTING as STANDING), possibly too little data for self-attention; any fix is chosen on validation only.
+- Transformer: sharp validation-to-test drop (largest error: SITTING as STANDING), possibly too little data for self-attention; any fix is chosen on validation only.
 - MLP results mix architecture with the authors' engineered features; we state this when comparing it with raw-signal models.
 
 ## Risks: Model 2 (M2)
@@ -35,11 +34,12 @@
 ## Shared risks
 
 <!-- M1 drafted these from BUILD_SPEC section 12; M2 and M3 may add bullets.
-     Add a timing/hardware point once we know which machines the interim runs used. -->
+     Hardware: checked in the metrics.json of every run selected in results/summary.csv. -->
 - Validation subjects may be easier than test subjects; we report both.
 - Single seed: differences of about 1% are not meaningful yet.
-- SITTING/STANDING confusion is expected with a waist-mounted phone; we analyse it rather than tune it away.
+- SITTING/STANDING confusion is expected from a waist-mounted phone; we analyse rather than tune it away.
 - Fairness: identical split, preprocessing, optimiser and early stopping; the test split only reports selected checkpoints.
+- Hardware: all interim runs used one laptop (RTX 4060 GPU, Ryzen 7 7840HS CPU), so interim timings are already same-machine; Phase 3 re-measures the final tuned models.
 
 ## Timeline to Final
 
