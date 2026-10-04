@@ -68,6 +68,42 @@ def test_masks_reject_validation_subjects_without_windows() -> None:
         train_val_masks(np.array([1, 2, 3]), [2, 9])
 
 
+# ---------------------------------------------------------------- committed split
+
+def test_committed_split_has_six_val_subjects_and_disjoint_sets() -> None:
+    split = load_split()
+    val, train, test = (set(split[k]) for k in ("val_subjects", "train_subjects", "test_subjects"))
+    assert split["seed"] == SPLIT_SEED and split["n_val_subjects"] == N_VAL_SUBJECTS
+    assert len(val) == 6 and val <= set(TRAIN_SUBJECTS)
+    assert val | train == set(TRAIN_SUBJECTS) and len(train) == 15
+    assert sorted(test) == TEST_SUBJECTS
+    assert not (val & train or val & test or train & test)
+    assert load_val_subjects() == split["val_subjects"]
+
+
+def test_committed_split_equals_the_seeded_selection() -> None:
+    assert load_split() == make_split(TRAIN_SUBJECTS, TEST_SUBJECTS)
+
+
+@pytest.mark.needs_data
+def test_committed_split_matches_the_real_subject_files() -> None:
+    train_subjects, test_subjects = read_subjects("train"), read_subjects("test")
+    assert sorted(set(train_subjects.tolist())) == TRAIN_SUBJECTS
+    assert sorted(set(test_subjects.tolist())) == TEST_SUBJECTS
+    assert load_split() == make_split(train_subjects, test_subjects)
+    assert main(["--check"]) == 0
+
+
+@pytest.mark.needs_data
+def test_real_masks_split_7352_windows_into_5276_and_2076() -> None:
+    subjects = read_subjects("train")
+    train_mask, val_mask = train_val_masks(subjects, load_val_subjects())
+    assert subjects.shape == (7352,)
+    assert int(train_mask.sum()) == 5276 and int(val_mask.sum()) == 2076
+    assert not np.any(train_mask & val_mask) and np.all(train_mask | val_mask)
+    assert set(subjects[val_mask].tolist()) == set(load_val_subjects())
+
+
 # ---------------------------------------------------------------- split file and CLI
 
 def _fake_uci_dir(root: Path) -> Path:
