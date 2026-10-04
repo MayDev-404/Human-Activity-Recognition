@@ -179,9 +179,36 @@ def test_subset_keeps_first_training_windows_and_full_normalisation(fake: tuple[
     assert small.meta["standardizer"] == full.meta["standardizer"]
 
 
-def test_augment_is_not_available_yet() -> None:
-    with pytest.raises(NotImplementedError, match="M3.4"):
-        build_raw_loaders(batch_size=4, seed=0, augment=True)
+def _epoch(loader: torch.utils.data.DataLoader) -> torch.Tensor:
+    return torch.cat([x for x, _ in loader])
+
+
+def test_augment_false_leaves_the_data_unchanged(fake: tuple[Path, Path]) -> None:
+    uci, split_file = fake
+    bundle = build_raw_loaders(batch_size=4, seed=0, uci_dir=uci, split_file=split_file)
+    assert bundle.meta["augment"] is False and bundle.meta["augmentation"] is None
+    x_train, _ = _all(bundle.train)
+    epoch = _epoch(bundle.train).numpy()
+    # Same windows, only reordered by the shuffle.
+    np.testing.assert_array_equal(np.sort(epoch, axis=0), np.sort(x_train, axis=0))
+
+
+def test_augment_true_changes_training_windows_only_and_is_seeded(fake: tuple[Path, Path]) -> None:
+    uci, split_file = fake
+
+    def build(seed: int):
+        return build_raw_loaders(batch_size=4, seed=seed, augment=True, uci_dir=uci, split_file=split_file)
+
+    plain = build_raw_loaders(batch_size=4, seed=0, uci_dir=uci, split_file=split_file)
+    aug = build(0)
+    assert aug.meta["augment"] is True
+    assert aug.meta["augmentation"] == {"jitter_sigma": 0.05, "scale_sigma": 0.1, "p": 0.5}
+    assert aug.meta["counts"] == plain.meta["counts"]
+    assert not torch.equal(_epoch(aug.train), _epoch(plain.train))
+    for split in ("val", "test"):
+        assert torch.equal(_epoch(getattr(aug, split)), _epoch(getattr(plain, split)))
+    assert torch.equal(_epoch(build(0).train), _epoch(build(0).train))
+    assert not torch.equal(_epoch(build(0).train), _epoch(build(1).train))
 
 
 # ---------------------------------------------------------------- real data

@@ -17,6 +17,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
+from har.data.augment import AugmentedTensorDataset, RandomAugment
 from har.data.bundle import DataBundle
 from har.data.constants import ACTIVITY_NAMES, CHANNELS, N_CLASSES, WINDOW_LEN
 from har.data.normalize import ChannelStandardizer
@@ -87,11 +88,10 @@ def build_raw_loaders(
     ``ChannelStandardizer`` is fitted on the training-subject windows only and applied to
     train, validation and test. The train loader is shuffled with a generator seeded by
     ``seed``. ``subset`` (smoke runs only) keeps the first ``subset`` training windows after
-    the split; the standardiser is still fitted on all training-subject windows.
+    the split; the standardiser is still fitted on all training-subject windows. ``augment``
+    (off for all comparison runs) applies ``RandomAugment`` to training windows only, after
+    standardisation, with its own generator seeded from ``seed``.
     """
-    if augment:
-        raise NotImplementedError("augmentation lands in M3.4")
-
     x_all, y_all, subjects_all = load_raw_split("train", uci_dir)
     x_test, y_test, subjects_test = load_raw_split("test", uci_dir)
     if set(subjects_all.tolist()) & set(subjects_test.tolist()):
@@ -109,7 +109,14 @@ def build_raw_loaders(
     if subset is not None:
         x_train, y_train = x_train[:subset], y_train[:subset]
 
-    train = DataLoader(_tensor_dataset(x_train, y_train), batch_size=batch_size, shuffle=True,
+    train_set = _tensor_dataset(x_train, y_train)
+    augmenter = None
+    if augment:
+        # Separate stream from the shuffle generator, still fully determined by the seed.
+        augmenter = RandomAugment(generator=make_generator(seed + 1))
+        train_set = AugmentedTensorDataset(*train_set.tensors, transform=augmenter)
+
+    train = DataLoader(train_set, batch_size=batch_size, shuffle=True,
                        generator=make_generator(seed), num_workers=0)
     val = DataLoader(_tensor_dataset(x_val, y_val), batch_size=batch_size, shuffle=False, num_workers=0)
     test = DataLoader(_tensor_dataset(x_test, y_test), batch_size=batch_size, shuffle=False, num_workers=0)
@@ -125,6 +132,7 @@ def build_raw_loaders(
         "normalisation": f"per-channel z-score fitted on {len(train_subjects)} training subjects",
         "standardizer": scaler.to_dict(),
         "augment": augment,
+        "augmentation": augmenter.to_dict() if augmenter else None,
         "subset": subset,
     }
     return DataBundle(train=train, val=val, test=test, input_shape=(WINDOW_LEN, len(CHANNELS)),
