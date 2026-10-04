@@ -13,4 +13,4 @@ Order: M3.1, M3.2, M3.3, M3.6, M3.4, M3.5, M3.8, M3.9, M3.7 (and the final contr
 | M3.7 | Contribution log generator | Done | addyan/contrib-log |
 | M3.8 | 4 literature rows and synthesis | Done | addyan/lit, addyan/lit-summary |
 | M3.9 | Raw preprocessing section and RNN risks | Done | addyan/report-preproc |
-| M3.7 (final) | Regenerate docs/contribution_log.md after the last code and results commits (final-hour step 4) | Todo | |
+| M3.7 (final) | Regenerate docs/contribution_log.md after the last code and results commits (final-hour step 4) | Done | addyan/contrib-log-final |
