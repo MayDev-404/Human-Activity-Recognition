@@ -102,7 +102,8 @@ def dummy_root(tmp_path: Path) -> Path:
     _png(root, "docs/figures/class_distribution.png")
     _png(root, "results/figures/confusion_test_cnn1d.png")
     _write(root, "docs/contribution_log.md",
-           "# Contribution log\n\nHEAD: abcdef1234567\n\n| Member | Commits |\n|---|---|\n| Dummy | 1 |\n")
+           "# Contribution log\n\nHEAD: abcdef1234567\n\n| Member | Commits | Lines added | PRs merged |\n"
+           "|---|---:|---:|---:|\n| Dummy One (M1) | 1 | 10 | 2 |\n| Dummy Two (M2) | 3 | 30 | 1 |\n")
     return root
 
 
@@ -147,9 +148,9 @@ def test_build_fills_part_b_and_removes_parts_a_and_c(dummy_root: Path) -> None:
     doc = Document(str(_build(dummy_root)))
     text = _all_text(doc)
     for gone in ("PART A", "PART C", "Synopsis/Interim/Final", "<NAME OF THE STUDENT", "MONTH AND YEAR",
-                 "Interim report should be", "Minimum 8", "hidden comment"):
+                 "Interim report should be", "Minimum 8", "hidden comment", "TEMPLATE", "due Fri"):
         assert gone not in text, gone
-    for present in ("Interim report on", "INTERIM REPORT", "Mayank Kejariwal - REG-1", "Addyan Kumar - REG-3",
+    for present in ("Interim report on", "PART B : INTERIM REPORT", "Mayank Kejariwal - REG-1", "Addyan Kumar - REG-3",
                     "October 2026", "Team 99:", "https://github.com/example/dummy", "Confirmed from Synopsis",
                     "Dummy text for preprocessing_raw.", "Dummy bullet two", "at commit abcdef1"):
         assert present in text, present
@@ -163,7 +164,7 @@ def test_tables_are_filled_by_header(dummy_root: Path) -> None:
     lit = builder.find_table(doc, builder.LIT_HEADERS)
     papers = [row.cells[0].text for row in lit.rows[1:]]
     assert len(papers) == sum(LIT_COUNTS.values()) == 13
-    assert papers[0] == "Dummymayank0, 2020 [1]" and papers[-1] == "Dummyaddyan3, 2020 [13]"
+    assert papers[0] == "Dummymayank0, 2020" and papers[-1] == "Dummyaddyan3, 2020"  # no reference list, no [n]
 
     models = builder.find_table(doc, builder.MODEL_HEADERS)
     rows = {r.cells[0].text: [c.text for c in r.cells] for r in models.rows[1:]}
@@ -180,18 +181,32 @@ def test_tables_are_filled_by_header(dummy_root: Path) -> None:
     assert [r.cells[3].text for r in contrib.rows[1:]] == ["", "", ""]  # signed by hand
 
 
-def test_captions_figures_and_references(dummy_root: Path) -> None:
+def test_keeps_the_template_part_b_form(dummy_root: Path) -> None:
+    """Only the template's headings, label lines and three tables, plus two captioned figures."""
     doc = Document(str(_build(dummy_root)))
     text = _all_text(doc)
-    captions = re.findall(r"TABLE ([IVX]+)\.", text)
-    assert captions == ["I", "II", "III", "IV", "V"]
-    assert "TABLE V. TIMELINE TO FINAL" in text
+    template = Document(str(builder.TEMPLATE))
+    assert len(doc.tables) == 3  # the template's Part B tables only
+    assert not re.search(r"TABLE [IVX]+\.", text)  # no added table captions
+    assert "References" not in text and not any(re.match(r"^\[\d+\] ", p.text) for p in doc.paragraphs)
+    part_b_headings = [p.text for p in template.paragraphs
+                       if p.style.name == "Heading 2" and p.text[:2] in ("1.", "2.", "3.", "4.", "5.")]
+    headings = [p.text for p in doc.paragraphs if p.style.name.startswith("Heading")]
+    assert headings == ["PART B : INTERIM REPORT"] + part_b_headings
+    # section-file headings are dropped and markdown tables become bullets
+    assert "Remaining work" not in text and "Timeline to Final" not in text
+    assert "• 1 Jan: Dummy milestone; Owner: All" in text
+    # commit evidence is one sentence with the per-member counts
+    assert "Dummy One (M1): 1 commit, 2 merged PRs; Dummy Two (M2): 3 commits, 1 merged PR" in text
+    # template fonts: table text inherits the template size; body text is 10.5 pt
+    lit = builder.find_table(doc, builder.LIT_HEADERS)
+    assert all(r.font.size is None for r in lit.rows[1].cells[1].paragraphs[0].runs)
+    body = next(p for p in doc.paragraphs if p.text.startswith("Dummy text for preprocessing_raw"))
+    assert all(r.font.size.pt == 10.5 for r in body.runs)
+    # the two figures, with captions below them
     assert "Fig. 1. Windows per activity class" in text
     assert "Fig. 2. Test-set confusion matrix of the 1D-CNN (raw signal)" in text  # best val macro-F1
-    template_images = len(Document(str(builder.TEMPLATE)).inline_shapes)  # cover logo
-    assert len(doc.inline_shapes) == template_images + 2
-    refs = [p.text for p in doc.paragraphs if re.match(r"^\[\d+\] ", p.text)]
-    assert len(refs) == 14 and refs[-1].startswith("[14] J. Reyes-Ortiz")
+    assert len(doc.inline_shapes) == len(template.inline_shapes) + 2  # cover logo + 2 figures
 
 
 def test_final_build_refuses_placeholders_but_draft_builds(dummy_root: Path) -> None:

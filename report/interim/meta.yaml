@@ -12,5 +12,3 @@ models:
   - {key: bilstm,      label: "BiLSTM (raw signal)",              owner: M3}
   - {key: gru,         label: "BiGRU ablation (raw signal)",      owner: M3}
   - {key: transformer, label: "Transformer encoder (raw signal)", owner: M1}
-# Reference [14], after the 13 literature references (BUILD_SPEC 9.2).
-dataset_citation: 'J. Reyes-Ortiz, D. Anguita, A. Ghio, L. Oneto, and X. Parra, "Human Activity Recognition Using Smartphones," UCI Machine Learning Repository, 2013, doi: 10.24432/C54S4K.'
