@@ -26,7 +26,9 @@
 
 ## Risks: Model 3 (M3)
 
-<!-- M3 (M3.9) -->
+<!-- M3 (M3.9): revisit after the BiLSTM and GRU runs. -->
+- Recurrence over 128 steps is sequential, so the BiLSTM and GRU are likely slower than the CNN; costs are compared on one machine in Phase 3.
+- Static postures show almost no body acceleration, so the recurrent models must separate them using the gravity channels.
 
 ## Shared risks
 
