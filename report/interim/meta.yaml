@@ -1,7 +1,7 @@
 # Inputs for report/build_interim_report.py (BUILD_SPEC 10.2).
 # Member names come from configs/team.yaml; registration numbers from
 # report/interim/members.local.yaml (gitignored, never committed).
-team_no: "FILL_ME"      # builder refuses to run while this placeholder remains (unless --draft)
+team_no: "<team_no>"    # placeholder: team number not assigned yet; replace before submission
 title: "Comparative Evaluation of Deep Learning Architectures for Human Activity Recognition from Smartphone Inertial Sensor Signals"
 title_status: "Confirmed from Synopsis"
 repo_url: auto            # from `git remote get-url origin`, converted to https
