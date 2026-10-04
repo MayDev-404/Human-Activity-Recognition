@@ -1,0 +1,12 @@
+                    precision    recall  f1-score   support
+
+           WALKING     1.0000    0.9968    0.9984       317
+  WALKING_UPSTAIRS     1.0000    1.0000    1.0000       289
+WALKING_DOWNSTAIRS     1.0000    1.0000    1.0000       260
+           SITTING     0.9164    0.8995    0.9079       378
+          STANDING     0.9030    0.9213    0.9121       394
+            LAYING     1.0000    1.0000    1.0000       438
+
+          accuracy                         0.9663      2076
+         macro avg     0.9699    0.9696    0.9697      2076
+      weighted avg     0.9664    0.9663    0.9663      2076

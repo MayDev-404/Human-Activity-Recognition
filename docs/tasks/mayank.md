@@ -5,8 +5,8 @@ Order: M1.0, M1.1, M1.2 (code and tests), M1.3 (code and tests), M1.5 part 1, M1
 | ID | Task | Status | Branch |
 |----|------|--------|--------|
 | M1.0 | Repository scaffold | Done | main |
-| M1.1 | Engineered-feature pipeline | Todo | mayank/features |
-| M1.2 | Model 1: MLP (code, tests, preliminary run, notes) | In progress | mayank/mlp |
-| M1.3 | Model 4: Transformer encoder (code, tests, run if time, notes) | In progress | mayank/transformer |
+| M1.1 | Engineered-feature pipeline | Done | mayank/features |
+| M1.2 | Model 1: MLP (code, tests, preliminary run, notes) | Done | mayank/mlp |
+| M1.3 | Model 4: Transformer encoder (code, tests, run if time, notes) | Done | mayank/transformer |
 | M1.4 | 4 literature rows | Done | mayank/lit |
 | M1.5 | Report builder, meta, risk plan and timeline | In progress | mayank/report |

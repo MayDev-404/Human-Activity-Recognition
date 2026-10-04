@@ -1,0 +1,2 @@
+<!-- Report section 2, engineered-feature pipeline (M1). Budget: 80 words or fewer. -->
+The MLP uses the 561 features computed by the dataset authors from the same windows: time and frequency domain statistics (e.g. mean, energy, entropy, FFT band energies, gravity angles) of the body, gravity and jerk signals, scaled to [-1, 1]. Duplicate band-energy names are made unique with the column index. A StandardScaler fitted on the 15 training subjects only is applied to all splits. The subject split matches the raw pipeline (a test checks label and subject alignment).
