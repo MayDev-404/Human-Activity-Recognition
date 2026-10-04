@@ -1,0 +1,7 @@
+name: mlp
+owner: M1
+data:
+  representation: features
+model:
+  target: har.models.mlp.MLP
+  params: {input_dim: 561, hidden: [256, 128], dropout: 0.3, n_classes: 6}

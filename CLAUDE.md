@@ -18,8 +18,16 @@ The full specification is in `docs/BUILD_SPEC.md`. Read it completely before sta
 
 1. Run `git config user.name`, `git config user.email` and `gh auth status`, and show the results to the human.
 2. Ask which member they are (M1, M2 or M3) unless they already said so.
-3. If the name does not match that member, the email is not one linked to their own GitHub account, or `gh` is logged into someone else's account, stop and help them fix **their own** setup (`git config --global user.name "..."`, `git config --global user.email "..."`, `gh auth login`). Do not continue until they confirm.
+3. If the name does not match that member, the email is not one linked to their own GitHub account, or `gh` is logged into someone else's account, stop and help them fix **their own** setup (on their own machine: `git config --global user.name "..."`, `git config --global user.email "..."`, `gh auth login`; in the shared workspace: see below). Do not continue until they confirm.
 4. Work only on that member's tasks from `docs/BUILD_SPEC.md` section 6, following the **"Order"** line at the top of that member's section (it takes precedence over numeric order).
+
+### Shared workspace (all three members use this folder on Mayank's laptop)
+
+- One member at a time. Before starting, `git status` must be clean. If it shows another member's uncommitted changes, stop and ask the human; never commit, stash or discard someone else's work.
+- Logging in to `gh` does **not** change who commits are credited to: git takes the author from `user.name` and `user.email`, and the global values on this laptop are Mayank's. So at the start of every session, set the identity of the member at the keyboard **for this repository only** (never `--global`, which would change Mayank's identity everywhere): `git config user.name "<full name>"` and `git config user.email "<email verified on that member's GitHub account>"`.
+- `git push` and `gh pr create` act as the **active** `gh` account (git uses `gh` as its credential helper here). Add each account once with `gh auth login`, then `gh auth switch --user <username>` at the start of each session.
+- Re-run the three checks in step 1 and show them to the human before the first commit of the session.
+- Environment on this laptop: use the existing `.venv` (Python 3.12) as it is. It already has CUDA PyTorch (`2.14.1+cu130`, RTX 4060 GPU; `python -c "import torch; print(torch.cuda.is_available())"` prints `True`), so do not reinstall PyTorch. Training picks the GPU automatically.
 
 ## 2. Git rules (contribution is graded from the commit history)
 

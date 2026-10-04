@@ -1,0 +1,12 @@
+| Paper (Author, Year) | Method | Dataset | Key Result | Relevance to Project |
+|---|---|---|---|---|
+| Anguita et al., 2013 | Multiclass SVM (one-vs-all, Gaussian kernel) on 561 engineered features | UCI HAR, introduced in this paper | 96% test accuracy on 2,947 windows; SITTING has the lowest recall (88%) | Defines our dataset and the classical bar for the MLP; its SITTING errors predict the static-posture confusion we expect |
+| Reyes-Ortiz et al., 2016 | TAHAR: probabilistic SVM with temporal filtering of postural transitions | SBHAR (UCI HAR extended with transitions), PAMAP2, REALDISP | SBHAR error 3.22% (transitions learned) and 3.64% (treated as unknown); PAMAP2 error 5.67% | Same lab and sensors; feature-based pipelines stay competitive, and fixed windows handle postural transitions poorly |
+| Mahmud et al., 2020 | Self-attention network with sensor-modality attention; no recurrent layers | PAMAP2, OPPORTUNITY, Skoda, USC-HAD | Window-wise macro-F1: PAMAP2 0.96, Skoda 0.97, OPPORTUNITY 0.67, USC-HAD 0.55 | Shows attention alone can model wearable sensor sequences; motivates the Transformer as Model 4 |
+| Dirgová Luptáková et al., 2022 | Transformer encoder on standardised accelerometer and gyroscope sequences | KU-HAR (90 participants, 18 classes), augmented to 83,129 samples | 99.2% average accuracy versus 89.67% for a random forest baseline | Attention-based state of the art, but its random 70:15:15 split is not subject-wise, the leakage our protocol avoids |
+
+## References
+- D. Anguita, A. Ghio, L. Oneto, X. Parra, and J. L. Reyes-Ortiz, "A public domain dataset for human activity recognition using smartphones," in *Proc. 21st Eur. Symp. Artif. Neural Netw., Comput. Intell. Mach. Learn. (ESANN)*, Bruges, Belgium, 2013, pp. 437-442.
+- J.-L. Reyes-Ortiz, L. Oneto, A. Samà, X. Parra, and D. Anguita, "Transition-aware human activity recognition using smartphones," *Neurocomputing*, vol. 171, pp. 754-767, 2016, doi: 10.1016/j.neucom.2015.07.085.
+- S. Mahmud, M. T. H. Tonmoy, K. K. Bhaumik, A. K. M. M. Rahman, M. A. Amin, M. Shoyaib, M. A. H. Khan, and A. A. Ali, "Human activity recognition from wearable sensor data using self-attention," in *Proc. 24th Eur. Conf. Artif. Intell. (ECAI)*, Frontiers in Artificial Intelligence and Applications, vol. 325, 2020, pp. 1332-1339, doi: 10.3233/FAIA200236.
+- I. Dirgová Luptáková, M. Kubovčík, and J. Pospíchal, "Wearable sensor-based human activity recognition with transformer model," *Sensors*, vol. 22, no. 5, Art. no. 1911, 2022, doi: 10.3390/s22051911.

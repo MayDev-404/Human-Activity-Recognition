@@ -1,0 +1,257 @@
+{
+  "model": "cnn1d",
+  "run_id": "20261004-185204_9466717",
+  "git_sha": "9466717",
+  "git_dirty": false,
+  "run_by": "Ishan Abhijit Saraf",
+  "status": "preliminary, untuned, single seed",
+  "representation": "raw",
+  "params_trainable": 197702,
+  "model_size_mb": 0.7580986022949219,
+  "best_epoch": 9,
+  "epochs_run": 19,
+  "train_time_s": 7.9206764999980805,
+  "mean_epoch_time_s": 0.41665622105249084,
+  "val": {
+    "accuracy": 0.9662813102119461,
+    "macro_f1": 0.9697262820393311,
+    "per_class": {
+      "WALKING": {
+        "precision": 1.0,
+        "recall": 0.9968454258675079,
+        "f1": 0.9984202211690363,
+        "support": 317
+      },
+      "WALKING_UPSTAIRS": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 289
+      },
+      "WALKING_DOWNSTAIRS": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 260
+      },
+      "SITTING": {
+        "precision": 0.9164420485175202,
+        "recall": 0.8994708994708994,
+        "f1": 0.9078771695594126,
+        "support": 378
+      },
+      "STANDING": {
+        "precision": 0.9029850746268657,
+        "recall": 0.9213197969543148,
+        "f1": 0.9120603015075377,
+        "support": 394
+      },
+      "LAYING": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 438
+      }
+    },
+    "confusion": [
+      [
+        316,
+        0,
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        289,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        260,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        340,
+        38,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        31,
+        363,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        438
+      ]
+    ]
+  },
+  "test": {
+    "accuracy": 0.9389209365456397,
+    "macro_f1": 0.9405870125262137,
+    "per_class": {
+      "WALKING": {
+        "precision": 1.0,
+        "recall": 0.9979838709677419,
+        "f1": 0.9989909182643795,
+        "support": 496
+      },
+      "WALKING_UPSTAIRS": {
+        "precision": 0.9744680851063829,
+        "recall": 0.9723991507430998,
+        "f1": 0.973432518597237,
+        "support": 471
+      },
+      "WALKING_DOWNSTAIRS": {
+        "precision": 0.9790209790209791,
+        "recall": 1.0,
+        "f1": 0.9893992932862191,
+        "support": 420
+      },
+      "SITTING": {
+        "precision": 0.8007448789571695,
+        "recall": 0.8757637474541752,
+        "f1": 0.8365758754863813,
+        "support": 491
+      },
+      "STANDING": {
+        "precision": 0.8918918918918919,
+        "recall": 0.806390977443609,
+        "f1": 0.8469891411648569,
+        "support": 532
+      },
+      "LAYING": {
+        "precision": 1.0,
+        "recall": 0.9962756052141527,
+        "f1": 0.9981343283582089,
+        "support": 537
+      }
+    },
+    "confusion": [
+      [
+        495,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        458,
+        9,
+        4,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        420,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        9,
+        0,
+        430,
+        52,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        103,
+        429,
+        0
+      ],
+      [
+        0,
+        2,
+        0,
+        0,
+        0,
+        535
+      ]
+    ]
+  },
+  "latency": {
+    "cpu_bs1": {
+      "mean_ms": 0.4844810000213329,
+      "p50_ms": 0.4502500014496036,
+      "p95_ms": 0.601245003781514,
+      "batch_size": 1,
+      "device": "cpu",
+      "threads": 1,
+      "warmup": 20,
+      "iters": 200
+    },
+    "cpu_bs256": {
+      "mean_ms": 76.3138845001231,
+      "p50_ms": 75.93099999940023,
+      "p95_ms": 80.13552499614889,
+      "batch_size": 256,
+      "device": "cpu",
+      "threads": 1,
+      "warmup": 20,
+      "iters": 200
+    },
+    "device_bs1": {
+      "mean_ms": 1.0452345003432129,
+      "p50_ms": 0.9703500036266632,
+      "p95_ms": 1.113730001088697,
+      "batch_size": 1,
+      "device": "cuda",
+      "threads": null,
+      "warmup": 20,
+      "iters": 200
+    }
+  },
+  "hardware": {
+    "python": "3.12.10",
+    "torch": "2.14.1+cu130",
+    "os": "Windows-11-10.0.26200-SP0",
+    "cpu": "AMD Ryzen 7 7840HS w/ Radeon 780M Graphics",
+    "processor": "AMD64 Family 25 Model 116 Stepping 1, AuthenticAMD",
+    "cpu_count": 16,
+    "device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "val_subjects": [
+    3,
+    15,
+    19,
+    22,
+    28,
+    29
+  ],
+  "protocol_override": false,
+  "smoke": false,
+  "tag": null,
+  "counts": {
+    "train": 5276,
+    "val": 2076,
+    "test": 2947
+  }
+}

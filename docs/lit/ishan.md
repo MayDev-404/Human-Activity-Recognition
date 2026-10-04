@@ -1,0 +1,14 @@
+| Paper (Author, Year) | Method | Dataset | Key Result | Relevance to Project |
+|---|---|---|---|---|
+| Yang et al., 2015 | Deep CNN with temporal convolution and pooling over raw multichannel signals | OPPORTUNITY, Hand Gesture | OPPORTUNITY accuracy 87.0%, 82.5% and 85.8% for subjects 1 to 3 without smoothing, about 5% above the best baseline | Early evidence that convolutions over raw channels learn useful features without hand engineering; the basis for our Model 2 |
+| Jiang & Yin, 2015 | 2-layer CNN on 2D-DFT activity images; DCNN+ adds an SVM | UCI HAR, USC-HAD, SHO | UCI HAR test accuracy 95.18% (DCNN) and 97.59% (DCNN+) | A direct CNN result on our dataset; shows how strongly the input representation affects CNN accuracy |
+| Ronao & Cho, 2016 | 1D convnet on raw accelerometer and gyroscope signals; optional FFT features | UCI HAR | 94.79% test accuracy on raw signals; 95.75% when temporal FFT features are added | Closest published setup to our 1D-CNN on raw UCI HAR windows, so it is the main reference value for Model 2 |
+| Wang et al., 2019 | Survey of deep learning for sensor-based activity recognition | Many; lists UCI Smartphone (30 subjects, 6 activities, 10,299 samples) | No family wins everywhere; CNNs lead on UCI Smartphone, RNNs suit short ordered activities, hybrids often beat single models | Frames the central question of our comparison and predicts that each architecture family has different strengths |
+| Xia et al., 2020 | Two LSTM layers, then convolution, global average pooling and batch normalisation | UCI HAR, WISDM, OPPORTUNITY | 95.78% on UCI HAR, 95.85% on WISDM and 92.63% on OPPORTUNITY | Hybrid recurrent-convolutional result on our dataset; a reference for combining Models 2 and 3 in future work |
+
+## References
+- J. B. Yang, M. N. Nguyen, P. P. San, X. L. Li, and S. Krishnaswamy, "Deep convolutional neural networks on multichannel time series for human activity recognition," in *Proc. 24th Int. Joint Conf. Artif. Intell. (IJCAI)*, Buenos Aires, Argentina, 2015, pp. 3995-4001.
+- W. Jiang and Z. Yin, "Human activity recognition using wearable sensors by deep convolutional neural networks," in *Proc. 23rd ACM Int. Conf. Multimedia (MM '15)*, Brisbane, Australia, 2015, pp. 1307-1310, doi: 10.1145/2733373.2806333.
+- C. A. Ronao and S.-B. Cho, "Human activity recognition with smartphone sensors using deep learning neural networks," *Expert Syst. Appl.*, vol. 59, pp. 235-244, 2016, doi: 10.1016/j.eswa.2016.04.032.
+- J. Wang, Y. Chen, S. Hao, X. Peng, and L. Hu, "Deep learning for sensor-based activity recognition: A survey," *Pattern Recognit. Lett.*, vol. 119, pp. 3-11, 2019, doi: 10.1016/j.patrec.2018.02.010.
+- K. Xia, J. Huang, and H. Wang, "LSTM-CNN architecture for human activity recognition," *IEEE Access*, vol. 8, pp. 56855-56866, 2020, doi: 10.1109/ACCESS.2020.2982225.
