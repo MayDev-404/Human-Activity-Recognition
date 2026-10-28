@@ -477,8 +477,8 @@ REGENERATE = "M2 must rerun python scripts/make_results_table.py and commit the 
 def full_runs(inputs: Inputs) -> dict[str, list[Path]]:
     """Full run folders per model (``results/<model>/<run_id>/metrics.json``).
 
-    Smoke runs (folders starting with ``_``) and protocol-override runs are skipped: they never
-    get a row in results/summary.csv.
+    Smoke runs (folders starting with ``_``), protocol-override runs and tagged runs (Phase 3
+    final runs) are skipped: they never get a row in results/summary.csv.
     """
     runs: dict[str, list[Path]] = {}
     for metrics in sorted(inputs.path("results").glob("*/*/metrics.json")):
@@ -486,7 +486,8 @@ def full_runs(inputs: Inputs) -> dict[str, list[Path]]:
         if model_dir.name.startswith("_"):
             continue
         try:
-            if json.loads(metrics.read_text(encoding="utf-8")).get("protocol_override"):
+            run = json.loads(metrics.read_text(encoding="utf-8"))
+            if run.get("protocol_override") or run.get("tag"):
                 continue
         except (OSError, ValueError):
             pass  # an unreadable metrics.json still counts as a run that needs a summary row
