@@ -4,6 +4,7 @@ Usage:
     python scripts/train.py --config configs/<model>.yaml            # full run, committed
     python scripts/train.py --config configs/<model>.yaml --no-test  # while debugging
     python scripts/train.py --config configs/<model>.yaml --smoke    # quick check, results/_smoke/
+    python scripts/train.py --config configs/final/<model>.yaml --seed 43 --tag final   # Phase 3 final run
 """
 
 from __future__ import annotations
@@ -24,6 +25,8 @@ def main(argv: list[str] | None = None) -> Path:
     parser.add_argument("--no-test", action="store_true", help="skip the test split (use while debugging)")
     parser.add_argument("--allow-protocol-override", action="store_true",
                         help="allow train/seed keys in the model config (Phase 3 tuning only; recorded)")
+    parser.add_argument("--seed", type=int,
+                        help="seed from final_seeds in base.yaml (any other needs --allow-protocol-override)")
     parser.add_argument("--tag", help="text appended to the run id")
     parser.add_argument("--output-root", type=Path, default=RESULTS_ROOT, help="default: results/")
     args = parser.parse_args(argv)
@@ -34,6 +37,7 @@ def main(argv: list[str] | None = None) -> Path:
         allow_protocol_override=args.allow_protocol_override,
         tag=args.tag,
         output_root=args.output_root,
+        seed=args.seed,
     )
 
 

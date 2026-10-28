@@ -1,7 +1,8 @@
 """One end-to-end training run: config -> data -> fit -> evaluate -> profile -> run folder.
 
-Implements BUILD_SPEC M2.4 and the run folder of section 8.2. ``scripts/train.py`` only
-parses the command line and calls ``run_experiment``.
+Implements BUILD_SPEC M2.4 and the run folder of section 8.2, with the Phase 3 additions of
+PHASE3_SPEC 4.1 (``--seed``). ``scripts/train.py`` only parses the command line and calls
+``run_experiment``.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from har.eval.plots import plot_confusion, plot_history
 from har.eval.profiling import count_params, hardware_info, measure_latency, model_size_mb
 from har.train.trainer import HISTORY_FIELDS, TrainConfig, fit, predict, resolve_device
 from har.utils.build import build_from_target
-from har.utils.config import load_config
+from har.utils.config import ProtocolError, load_config
 from har.utils.paths import REPO_ROOT, RESULTS_ROOT
 from har.utils.seed import set_seed
 
@@ -82,6 +83,26 @@ def make_run_id(git_sha: str, tag: str | None = None, now: datetime | None = Non
     if tag:
         run_id += "_" + re.sub(r"[^A-Za-z0-9._-]+", "-", tag.strip())
     return run_id
+
+
+def apply_seed(cfg: dict, seed: int | None, allow_protocol_override: bool = False) -> None:
+    """Set ``cfg['seed']`` from ``--seed`` (PHASE3_SPEC D1); ``None`` keeps the base.yaml seed.
+
+    A seed listed in ``final_seeds`` (base.yaml) is part of the protocol. Any other seed raises
+    ``ProtocolError`` unless the override is allowed, and the run is then recorded as a
+    protocol override.
+    """
+    if seed is None:
+        return
+    allowed = [int(s) for s in cfg.get("final_seeds") or []]
+    if seed not in allowed:
+        if not allow_protocol_override:
+            raise ProtocolError(
+                f"--seed {seed} is not in final_seeds {allowed} (configs/base.yaml). Use one of those, "
+                "or pass --allow-protocol-override (the run is then recorded as a protocol override)."
+            )
+        cfg["protocol_override"] = True
+    cfg["seed"] = seed
 
 
 def _import_loader(module_name: str, task: str) -> ModuleType:
@@ -167,17 +188,20 @@ def run_experiment(
     allow_protocol_override: bool = False,
     tag: str | None = None,
     output_root: Path | str = RESULTS_ROOT,
+    seed: int | None = None,
     verbose: bool = True,
 ) -> Path:
     """Train one model under the shared protocol and write its run folder; return the folder.
 
     ``smoke`` keeps 512 training windows, trains 2 epochs, measures latency at batch size 1
     with 2 warmup and 5 timed passes, and writes under ``<output_root>/_smoke/``. ``no_test``
-    skips the test split (``"test": null``). The folder is
-    ``<output_root>/<model name>/<run_id>/`` with the files listed in BUILD_SPEC 8.2.
+    skips the test split (``"test": null``). ``seed`` replaces the base.yaml seed (see
+    ``apply_seed``). The folder is ``<output_root>/<model name>/<run_id>/`` with the files
+    listed in BUILD_SPEC 8.2.
     """
     config = Path(config)
     cfg = load_config(config, allow_protocol_override=allow_protocol_override)
+    apply_seed(cfg, seed, allow_protocol_override)
     name = cfg.get("name") or config.stem
     subset = None
     if smoke:
@@ -216,6 +240,7 @@ def run_experiment(
         "git_dirty": git_dirty,
         "run_by": who,
         "status": SMOKE_STATUS if smoke else STATUS,
+        "seed": cfg["seed"],
         "representation": cfg["data"]["representation"],
         "params_trainable": count_params(model),
         "model_size_mb": model_size_mb(model),

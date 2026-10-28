@@ -28,6 +28,7 @@ SCHEMA_KEYS = {
     "model", "run_id", "git_sha", "git_dirty", "run_by", "status", "representation",
     "params_trainable", "model_size_mb", "best_epoch", "epochs_run", "train_time_s",
     "mean_epoch_time_s", "val", "test", "latency", "hardware", "val_subjects", "protocol_override",
+    "seed",
 }
 SPLIT_KEYS = {"accuracy", "macro_f1", "per_class", "confusion"}
 
@@ -72,6 +73,7 @@ def test_smoke_run_writes_every_file_and_schema_key(tmp_path: Path) -> None:
     assert m["representation"] == "synthetic" and m["protocol_override"] is False
     assert m["params_trainable"] == 16 * 6 + 6
     assert m["smoke"] is True and "smoke" in m["status"]
+    assert m["seed"] == 42                                                       # base.yaml seed by default
     assert 1 <= m["best_epoch"] <= m["epochs_run"] <= 2
     assert set(m["latency"]) == {"cpu_bs1", "device_bs1"}            # smoke: batch size 1 only
     assert m["latency"]["cpu_bs1"]["threads"] == 1 and m["latency"]["cpu_bs1"]["iters"] == 5
@@ -103,6 +105,34 @@ def test_protocol_keys_need_the_override_flag_and_are_recorded(tmp_path: Path) -
     run_dir = train_script.main(["--config", str(config), "--smoke", "--allow-protocol-override",
                                  "--output-root", str(tmp_path)])
     assert _metrics(run_dir)["protocol_override"] is True
+
+
+@pytest.mark.parametrize("seed", [42, 43, 44])
+def test_final_seeds_are_not_protocol_overrides(tmp_path: Path, seed: int) -> None:
+    run_dir = train_script.main(["--config", str(_config(tmp_path)), "--smoke", "--seed", str(seed),
+                                 "--output-root", str(tmp_path)])
+    m = _metrics(run_dir)
+    assert m["seed"] == seed and m["protocol_override"] is False
+    resolved = yaml.safe_load((run_dir / "config.resolved.yaml").read_text(encoding="utf-8"))
+    assert resolved["seed"] == seed and resolved["final_seeds"] == [42, 43, 44]
+
+
+def test_unlisted_seed_needs_the_override_flag_and_is_recorded(tmp_path: Path) -> None:
+    args = ["--config", str(_config(tmp_path)), "--smoke", "--seed", "7", "--output-root", str(tmp_path)]
+    with pytest.raises(ProtocolError, match="final_seeds"):
+        train_script.main(args)
+    m = _metrics(train_script.main(args + ["--allow-protocol-override"]))
+    assert m["seed"] == 7 and m["protocol_override"] is True
+
+
+def test_the_seed_changes_the_run(tmp_path: Path) -> None:
+    """The synthetic data and batch order follow the seed, so seeds 43 and 44 train differently."""
+    def train_losses(seed: int) -> list[str]:
+        run_dir = train_script.main(["--config", str(_config(tmp_path)), "--smoke", "--seed", str(seed),
+                                     "--output-root", str(tmp_path)])
+        with (run_dir / "history.csv").open(encoding="utf-8", newline="") as f:
+            return [row["train_loss"] for row in csv.DictReader(f)]
+    assert train_losses(43) != train_losses(44)
 
 
 def test_tag_and_repeated_runs_get_distinct_folders(tmp_path: Path) -> None:
