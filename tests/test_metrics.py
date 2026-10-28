@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +11,7 @@ import pytest
 
 from har.data.constants import ACTIVITY_NAMES
 from har.eval.metrics import classification_report_text, compute_metrics
-from har.eval.plots import display_name, plot_confusion, plot_history, plot_val_curves
+from har.eval.plots import display_name, plot_confusion, plot_cost_tradeoff, plot_history, plot_val_curves
 
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
@@ -119,6 +120,24 @@ def test_plot_val_curves_writes_a_png_and_caps_the_series(tmp_path: Path) -> Non
         plot_val_curves(curves, tmp_path / "too_many.png", slots={"cnn1d": 8, "mlp": 0})
     with pytest.raises(ValueError, match="no curves"):
         plot_val_curves({}, tmp_path / "none.png")
+
+
+def test_plot_cost_tradeoff_writes_a_png_and_checks_its_points(tmp_path: Path) -> None:
+    points = [{"name": "mlp", "latency_ms": 0.08, "f1_mean": 0.94, "f1_std": 0.01, "params": 212_230},
+              {"name": "gru", "latency_ms": 3.5, "f1_mean": 0.91, "f1_std": None, "params": 104_070},
+              {"name": "bilstm", "latency_ms": 1.4, "f1_mean": 0.907, "f1_std": 0.012, "params": 138_502},
+              {"name": "transformer", "latency_ms": 1.7, "f1_mean": 0.897, "f1_std": 0.012, "params": 109_766}]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)       # error bars on an empty log axis used to warn
+        assert _is_png(plot_cost_tradeoff(points, tmp_path / "cost.png",
+                                          slots={"mlp": 0, "bilstm": 2, "gru": 3, "transformer": 4}))
+    assert _is_png(plot_cost_tradeoff(points[:1], tmp_path / "one.png"))
+    with pytest.raises(ValueError, match="positive"):
+        plot_cost_tradeoff([points[0] | {"latency_ms": 0.0}], tmp_path / "zero.png")
+    with pytest.raises(ValueError, match="at most"):
+        plot_cost_tradeoff(points[:2], tmp_path / "too_many.png", slots={"mlp": 0, "gru": 8})
+    with pytest.raises(ValueError, match="no points"):
+        plot_cost_tradeoff([], tmp_path / "none.png")
 
 
 def test_display_name() -> None:

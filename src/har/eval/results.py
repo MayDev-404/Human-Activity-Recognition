@@ -1,4 +1,4 @@
-"""Results tables, selected-run figures and same-machine profiling (BUILD_SPEC M2.6 and 8.5, PHASE3_SPEC 4.1).
+"""Results tables, figures and same-machine profiling (BUILD_SPEC M2.6 and 8.5, PHASE3_SPEC 4.1 and 4.3).
 
 Every number written here is read from ``results/<model>/<run_id>/metrics.json`` files produced
 by ``scripts/train.py``. Two tables:
@@ -17,12 +17,13 @@ import json
 import re
 import shutil
 import statistics
+import warnings
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
-from har.data.constants import CHANNELS, N_FEATURES, WINDOW_LEN
-from har.eval.plots import plot_val_curves
+from har.data.constants import ACTIVITY_NAMES, CHANNELS, N_FEATURES, WINDOW_LEN
+from har.eval.plots import plot_confusion, plot_cost_tradeoff, plot_val_curves
 from har.eval.profiling import best_available_device, count_params, hardware_info, measure_latency, model_size_mb
 from har.train.runner import FINAL_CONFIG_DIR, FINAL_TAG
 from har.utils.build import build_from_target
@@ -257,17 +258,12 @@ def profile_latencies(path: Path) -> dict[str, float]:
                 if Path(row.get("config") or "").parent.name == FINAL_CONFIG_DIR and row.get("cpu_bs1_mean_ms")}
 
 
-def final_rows(results_root: Path = RESULTS_ROOT, configs_dir: Path = CONFIGS,
-               profile_label: str = PROFILE_LABEL) -> tuple[list[dict], list[str]]:
-    """Raw final values per model that has final runs (keys as in ``FINAL_CSV_COLUMNS``), and the models
-    without any. Fails loudly (``ValueError``) when a model's final runs are not one per final seed.
-
-    CPU latency comes from ``results/profile_<profile_label>.csv`` (one process, final configs)
-    when it has the model, otherwise from the mean of the runs' own measurements.
-    """
+def checked_final_runs(results_root: Path = RESULTS_ROOT, configs_dir: Path = CONFIGS
+                       ) -> tuple[dict[str, list[tuple[Path, dict]]], list[str]]:
+    """Model -> its final runs sorted by seed, for every model that has any (in report order), and the
+    models without any. Fails loudly (``ValueError``) when a model's final runs are not one per final seed."""
     seeds = load_yaml(Path(configs_dir) / "base.yaml").get("final_seeds") or []
-    latencies = profile_latencies(Path(results_root) / f"profile_{profile_label}.csv")
-    rows, missing = [], []
+    checked, missing = {}, []
     for model in model_configs(configs_dir):
         runs = final_runs(model, results_root)
         if not runs:
@@ -276,7 +272,23 @@ def final_rows(results_root: Path = RESULTS_ROOT, configs_dir: Path = CONFIGS,
         if not seeds:
             raise ValueError(f"{Path(configs_dir) / 'base.yaml'} has no final_seeds")
         check_final_runs(model, runs, seeds)
-        ms = [m for _, m in sorted(runs, key=lambda run: run[1]["seed"])]
+        checked[model] = sorted(runs, key=lambda run: run[1]["seed"])
+    return checked, missing
+
+
+def final_rows(results_root: Path = RESULTS_ROOT, configs_dir: Path = CONFIGS,
+               profile_label: str = PROFILE_LABEL) -> tuple[list[dict], list[str]]:
+    """Raw final values per model that has final runs (keys as in ``FINAL_CSV_COLUMNS``), and the models
+    without any. Fails loudly (``ValueError``) when a model's final runs are not one per final seed.
+
+    CPU latency comes from ``results/profile_<profile_label>.csv`` (one process, final configs)
+    when it has the model, otherwise from the mean of the runs' own measurements.
+    """
+    latencies = profile_latencies(Path(results_root) / f"profile_{profile_label}.csv")
+    checked, missing = checked_final_runs(results_root, configs_dir)
+    rows = []
+    for model, runs in checked.items():
+        ms = [m for _, m in runs]
         row = {"model": model, "run_by": ", ".join(dict.fromkeys(m["run_by"] for m in ms)),
                "representation": ms[0]["representation"], "params": ms[0]["params_trainable"]}
         for name, value in FINAL_METRICS.items():
@@ -408,6 +420,56 @@ def write_selected_figures(results_root: Path = RESULTS_ROOT, configs_dir: Path 
         if source.is_file():
             figures.mkdir(parents=True, exist_ok=True)
             written.append(Path(shutil.copyfile(source, figures / f"confusion_test_{model}.png")))
+    return written
+
+
+def summed_confusion(runs: list[tuple[Path, dict]], split: str = "test") -> list[list[int]]:
+    """Cell-by-cell sum of the runs' ``split`` confusion matrices (rows = true class): ``(C, C)`` counts."""
+    matrices = [m[split]["confusion"] for _, m in runs]
+    return [[sum(cells) for cells in zip(*rows)] for rows in zip(*matrices)]
+
+
+def write_final_figures(results_root: Path = RESULTS_ROOT, configs_dir: Path = CONFIGS,
+                        profile_label: str = PROFILE_LABEL) -> list[Path]:
+    """PHASE3_SPEC 4.3 figures from the runs tagged final, in ``results/figures/`` (none without final runs).
+
+    - ``final_val_curves.png``: validation macro-F1 per epoch of each model's first-seed (42) final run.
+    - ``confusion_test_<model>_final.png``: test confusion matrix summed over the seeds, row-normalised.
+    - ``cost_tradeoff.png``: test macro-F1 (mean ± sample std over the seeds) against the single-process
+      CPU latency at batch size 1 from ``results/profile_<profile_label>.csv`` (log x-axis), marker area
+      proportional to parameters. Skipped with a warning while that profile lacks a model's final config.
+
+    Colours follow ``write_selected_figures`` (one fixed palette slot per model). Fails like the final
+    table when a model's final runs are not one per final seed.
+    """
+    checked, _ = checked_final_runs(results_root, configs_dir)
+    if not checked:
+        return []
+    figures = Path(results_root) / "figures"
+    all_models = list(model_configs(configs_dir))
+    slots = {m: all_models.index(m) for m in checked}
+    seeds = load_yaml(Path(configs_dir) / "base.yaml")["final_seeds"]
+
+    curves = {m: read_history(next(d for d, metrics in runs if metrics["seed"] == seeds[0]) / "history.csv")
+              for m, runs in checked.items()}
+    written = [plot_val_curves(curves, figures / "final_val_curves.png", slots)]
+    for model, runs in checked.items():
+        written.append(plot_confusion(summed_confusion(runs), ACTIVITY_NAMES,
+                                      figures / f"confusion_test_{model}_final.png",
+                                      title=f"{model}: test set, seeds {', '.join(map(str, seeds))} summed"))
+
+    latencies = profile_latencies(Path(results_root) / f"profile_{profile_label}.csv")
+    unprofiled = [m for m in checked if m not in latencies]
+    if unprofiled:
+        warnings.warn(f"cost_tradeoff.png skipped: profile_{profile_label}.csv has no final-config row for "
+                      f"{unprofiled}; run python scripts/profile_all.py --label {profile_label} first")
+        return written
+    points = []
+    for model, runs in checked.items():
+        f1_mean, f1_std = mean_std([m["test"]["macro_f1"] for _, m in runs])
+        points.append({"name": model, "latency_ms": latencies[model], "f1_mean": f1_mean, "f1_std": f1_std,
+                       "params": runs[0][1]["params_trainable"]})
+    written.append(plot_cost_tradeoff(points, figures / "cost_tradeoff.png", slots))
     return written
 
 

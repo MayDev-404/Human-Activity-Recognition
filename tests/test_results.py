@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+import har.eval.results as results_module
 from har.eval.results import (
     FINAL_CSV_COLUMNS,
     README_END,
@@ -22,8 +23,10 @@ from har.eval.results import (
     profile_configs,
     read_history,
     select_best,
+    summed_confusion,
     timing_note,
     update_readme,
+    write_final_figures,
     write_results_table,
     write_selected_figures,
 )
@@ -97,6 +100,32 @@ def _final(results: Path, model: str, val_f1s: tuple[float, ...] = (0.95, 0.96, 
 def _csv_rows(path: Path) -> dict[str, dict]:
     with path.open(encoding="utf-8", newline="") as f:
         return {row["model"]: row for row in csv.DictReader(f)}
+
+
+def _cm(seed: int) -> list[list[int]]:
+    """A 6x6 test confusion matrix per seed: diagonal seed - 41, cell [3][4] = seed - 42.
+    Summed over seeds 42, 43, 44: diagonal 6, cell [3][4] = 3."""
+    cm = [[(seed - 41) * (i == j) for j in range(6)] for i in range(6)]
+    cm[3][4] = seed - 42
+    return cm
+
+
+def _with_confusions(run_dirs: list[Path]) -> list[Path]:
+    for run_dir in run_dirs:
+        path = run_dir / "metrics.json"
+        metrics = json.loads(path.read_text(encoding="utf-8"))
+        metrics["test"]["confusion"] = _cm(metrics["seed"])
+        path.write_text(json.dumps(metrics), encoding="utf-8")
+    return run_dirs
+
+
+def _profile(results: Path, latencies: dict[str, float], config_dir: str = "configs/final") -> Path:
+    """A profile_rtx4060-laptop.csv with the columns profile_latencies reads."""
+    rows = ["label,model,config,cpu_bs1_mean_ms"]
+    rows += [f"rtx4060-laptop,{m},{config_dir}/{m}.yaml,{ms}" for m, ms in latencies.items()]
+    path = results / "profile_rtx4060-laptop.csv"
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    return path
 
 
 def _readme(tmp_path: Path) -> Path:
@@ -308,6 +337,59 @@ def test_selected_figures(tmp_path: Path) -> None:
     assert (figures / "val_macro_f1_curves.png").read_bytes()[:8] == PNG_MAGIC
     assert not (figures / "confusion_test_mlp.png").exists()
     assert read_history(results / "cnn1d" / "20261004-100000_aaa" / "history.csv")[1]["val_macro_f1"] == 0.95
+
+
+def test_summed_confusion_adds_the_seeds_cell_by_cell() -> None:
+    runs = [(Path(f"s{seed}"), {"test": {"confusion": _cm(seed)}}) for seed in (42, 43, 44)]
+    expected = [[6 * (i == j) for j in range(6)] for i in range(6)]
+    expected[3][4] = 3
+    assert summed_confusion(runs) == expected
+
+
+def test_final_figures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    configs, results = _configs(tmp_path), tmp_path / "results"
+    _run(results, "cnn1d", "20261004-100000_aaa", val_f1=0.90, test_f1=0.93)    # interim run: not used
+    cnn = _with_confusions(_final(results, "cnn1d"))                            # test F1 0.93, 0.94, 0.95
+    _with_confusions(_final(results, "mlp", val_f1s=(0.90, 0.91, 0.92), params_trainable=212230))
+    _profile(results, {"mlp": 0.05, "cnn1d": 0.8})
+    calls: dict[str, list[tuple]] = {}
+    for name in ("plot_val_curves", "plot_confusion", "plot_cost_tradeoff"):       # record, then draw for real
+        def spy(*args, _name=name, _original=getattr(results_module, name), **kwargs):
+            calls.setdefault(_name, []).append(args)
+            return _original(*args, **kwargs)
+        monkeypatch.setattr(results_module, name, spy)
+
+    written = write_final_figures(results, configs)
+    assert [p.name for p in written] == ["final_val_curves.png", "confusion_test_mlp_final.png",
+                                         "confusion_test_cnn1d_final.png", "cost_tradeoff.png"]
+    assert all(p.parent == results / "figures" and p.read_bytes()[:8] == PNG_MAGIC for p in written)
+
+    (curves, _, slots), = calls["plot_val_curves"]
+    assert curves["cnn1d"] == read_history(cnn[0] / "history.csv")                 # the seed-42 final run
+    assert curves["mlp"][1]["val_macro_f1"] == 0.90 and slots == {"mlp": 0, "cnn1d": 1}
+    expected = [[6 * (i == j) for j in range(6)] for i in range(6)]
+    expected[3][4] = 3
+    assert [args[0] for args in calls["plot_confusion"]] == [expected, expected]
+
+    (points, _, _), = calls["plot_cost_tradeoff"]
+    assert [(p["name"], p["latency_ms"], p["params"]) for p in points] == [("mlp", 0.05, 212230),
+                                                                           ("cnn1d", 0.8, 197702)]
+    assert points[1]["f1_mean"] == pytest.approx(0.94) and points[1]["f1_std"] == pytest.approx(0.01)
+    assert points[0]["f1_mean"] == pytest.approx(0.89)
+
+
+def test_cost_tradeoff_waits_for_a_single_process_profile_of_every_final_config(tmp_path: Path) -> None:
+    configs, results = _configs(tmp_path), tmp_path / "results"
+    assert write_final_figures(results, configs) == []                             # no final runs yet
+    _with_confusions(_final(results, "cnn1d"))
+    _with_confusions(_final(results, "mlp"))
+    for latencies, config_dir in (({}, "configs/final"), ({"cnn1d": 0.8}, "configs/final"),
+                                  ({"mlp": 0.05, "cnn1d": 0.8}, "configs")):     # empty, partial, interim configs
+        _profile(results, latencies, config_dir)
+        with pytest.warns(UserWarning, match="profile_all.py --label rtx4060-laptop"):
+            written = write_final_figures(results, configs)
+        assert "cost_tradeoff.png" not in {p.name for p in written} and len(written) == 3
+    assert not (results / "figures" / "cost_tradeoff.png").exists()
 
 
 def test_profile_configs_writes_one_row_per_model(tmp_path: Path) -> None:
