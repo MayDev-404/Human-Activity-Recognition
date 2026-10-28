@@ -42,6 +42,7 @@ from docx.text.paragraph import Paragraph
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_interim_report as interim  # noqa: E402  (shared helpers: markdown, Cursor, tables, members, PDF)
 
+from har.eval.plots import display_name  # noqa: E402
 from har.utils.paths import REPO_ROOT  # noqa: E402
 
 BuildError = interim.BuildError
@@ -742,12 +743,12 @@ class FinalReportBuilder:
 
     def best_model(self) -> str | None:
         """The model with the best mean test macro-F1 (only chooses which confusion matrix to show)."""
-        scored =[(f, m) for m, row in self.data.final.items() if (f := _float(row.get("test_macro_f1_mean"))) is not None]
+        scored = [(f, m) for m, row in self.data.final.items() if (f := _float(row.get("test_macro_f1_mean"))) is not None]
         return max(scored)[1] if scored else None
 
     def final_table(self) -> tuple[list[str], list[list[str]], str]:
         """Table I from results/final_summary.csv: ``(header, rows, note)``."""
-        header =["Model", "Params", "Val Macro-F1", "Test Acc", "Test Macro-F1", "Train time (s)",
+        header = ["Model", "Params", "Val Macro-F1", "Test Acc", "Test Macro-F1", "Train time (s)",
                   "CPU latency (ms)"]
         fields = ["params", "val_macro_f1", "test_acc", "test_macro_f1", "train_time_s", "cpu_latency_bs1_ms"]
         if not self.data.final:
@@ -765,7 +766,7 @@ class FinalReportBuilder:
 
     def tuning_table(self) -> tuple[list[str], list[list[str]], str]:
         """Table II: each model's grid and selected configuration from its tuning_summary.csv."""
-        header =["Model", "Grid", "Selected", "Params", "Val Macro-F1"]
+        header = ["Model", "Grid", "Selected", "Params", "Val Macro-F1"]
         rows = []
         for model, label in self.labels.items():
             if model not in self.data.tuning:
@@ -787,8 +788,9 @@ class FinalReportBuilder:
         return header, rows, note
 
     def per_class_table(self) -> tuple[list[str], list[list[str]], str]:
-        """Table III: test F1 per class (rows) and model (columns) from results/analysis/per_class_f1.csv."""
-        header =["Class"] + list(self.labels.values())
+        """Table III: test F1 per class (rows, ``Walking upstairs``) and model (columns) from
+        results/analysis/per_class_f1.csv."""
+        header = ["Class"] + list(self.labels.values())
         if self.data.per_class is None:
             return header, [], "[MISSING: results/analysis/per_class_f1.csv]"
         try:
@@ -796,15 +798,15 @@ class FinalReportBuilder:
         except (StopIteration, ValueError):
             return header, [], missing(self.inputs, "results/analysis/per_class_f1.csv has an unknown layout "
                                                     "(see report/final/README.md)", "per_class_f1.csv layout")
-        rows = [[name] + [format_value(*cells.get((name, model), (None, None)), (".3f", 1, ""), None) or "n/a"
-                          for model in self.labels] for name in classes]
+        rows = [[display_name(name)] + [format_value(*cells.get((name, model), (None, None)), (".3f", 1, ""), None)
+                                        or "n/a" for model in self.labels] for name in classes]
         return header, rows, ""
 
     # ---- references and C.3
 
     def check_citations(self) -> None:
         """At least 12 references cited overall and at least 10 papers in Section II."""
-        cited =len(self.resolver.cited)
+        cited = len(self.resolver.cited)
         if cited < MIN_REFERENCES:
             self.inputs.problem(f"only {cited} references are cited; Part C needs at least {MIN_REFERENCES}")
         literature = len(self.resolver.cited_in.get(LITERATURE_FILE, set()))
@@ -834,7 +836,7 @@ class FinalReportBuilder:
 
     def contribution(self, member: interim.Member) -> tuple[str, str]:
         """``(model_task, key contributions)`` from report/final/contributions/<member>.md."""
-        rel =FINAL_DIR / "contributions" / f"{member.key}.md"
+        rel = FINAL_DIR / "contributions" / f"{member.key}.md"
         path = self.inputs.path(rel)
         if not path.is_file():
             marker = missing(self.inputs, f"{path} not found (written by {member.name} personally, 6.5)", str(rel))

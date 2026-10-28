@@ -299,7 +299,9 @@ def test_generated_tables(dummy_root: Path) -> None:
     assert tuning[1] == ["MLP (features)", "dropout {0.1, 0.2} × width {8, 16}", "c2: dropout 0.1, width 16",
                          "200", "0.510"]
     assert per_class[0] == ["Class"] + list(LABELS.values())
-    assert [r[0] for r in per_class[1:]] == ACTIVITY_NAMES and per_class[1][1] == "0.400 ± 0.010"
+    assert [r[0] for r in per_class[1:]] == ["Walking", "Walking upstairs", "Walking downstairs", "Sitting",
+                                             "Standing", "Laying"]
+    assert per_class[1][1] == "0.400 ± 0.010"
     assert "CPU latency at batch size 1 on one thread: profile_dummy.csv (single process)." in _all_text(doc)
 
 
