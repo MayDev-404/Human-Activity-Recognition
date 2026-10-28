@@ -21,7 +21,7 @@ Turns (PHASE3_SPEC section 7): F3.1 in T3; F3.2 and F3.3 in T6; F3.4 in T9; F3.5
 
 | ID | Task | Status | Branch |
 |----|------|--------|--------|
-| F3.1 | Tuning and final runs: BiLSTM and GRU | In progress | addyan/final-runs |
+| F3.1 | Tuning and final runs: BiLSTM and GRU | Done | addyan/final-runs |
 | F3.2 | Error analysis | Todo | addyan/error-analysis |
 | F3.3 | GRU latency check | Todo | addyan/error-analysis |
 | F3.4 | M3 sections and own contribution statement | Todo | addyan/final-sections |
