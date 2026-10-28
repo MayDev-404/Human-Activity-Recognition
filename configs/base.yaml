@@ -2,6 +2,9 @@
 # Changes need agreement from all three members. Model configs must not contain
 # `train` or `seed` keys; har.utils.config.load_config enforces this.
 seed: 42
+# Phase 3 final runs (PHASE3_SPEC D1): `scripts/train.py --seed N` accepts only these seeds
+# without --allow-protocol-override.
+final_seeds: [42, 43, 44]
 data:
   augment: false
 train:

@@ -44,6 +44,7 @@ def test_paths_point_into_the_repo() -> None:
 def test_base_yaml_holds_the_shared_protocol() -> None:
     base = load_yaml(CONFIGS / "base.yaml")
     assert base["seed"] == 42
+    assert base["final_seeds"] == [42, 43, 44]  # Phase 3 final runs (PHASE3_SPEC D1)
     assert base["data"]["augment"] is False
     assert base["train"] == {
         "batch_size": 64, "max_epochs": 50, "optimizer": "adam", "lr": 0.001,
