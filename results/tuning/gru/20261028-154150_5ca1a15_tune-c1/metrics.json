@@ -1,0 +1,136 @@
+{
+  "model": "gru",
+  "run_id": "20261028-154150_5ca1a15_tune-c1",
+  "git_sha": "5ca1a15",
+  "git_dirty": false,
+  "run_by": "Addyan Kumar",
+  "status": "tuning run, validation only",
+  "seed": 42,
+  "representation": "raw",
+  "params_trainable": 104070,
+  "model_size_mb": 0.39699554443359375,
+  "best_epoch": 12,
+  "epochs_run": 22,
+  "train_time_s": 7.891553399997065,
+  "mean_epoch_time_s": 0.3584348818172161,
+  "val": {
+    "accuracy": 0.960019267822736,
+    "macro_f1": 0.9633978938698161,
+    "per_class": {
+      "WALKING": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "support": 317
+      },
+      "WALKING_UPSTAIRS": {
+        "precision": 1.0,
+        "recall": 0.986159169550173,
+        "f1": 0.9930313588850174,
+        "support": 289
+      },
+      "WALKING_DOWNSTAIRS": {
+        "precision": 0.9848484848484849,
+        "recall": 1.0,
+        "f1": 0.9923664122137404,
+        "support": 260
+      },
+      "SITTING": {
+        "precision": 0.9141274238227147,
+        "recall": 0.873015873015873,
+        "f1": 0.8930987821380244,
+        "support": 378
+      },
+      "STANDING": {
+        "precision": 0.9029850746268657,
+        "recall": 0.9213197969543148,
+        "f1": 0.9120603015075377,
+        "support": 394
+      },
+      "LAYING": {
+        "precision": 0.9798657718120806,
+        "recall": 1.0,
+        "f1": 0.9898305084745763,
+        "support": 438
+      }
+    },
+    "confusion": [
+      [
+        317,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        285,
+        4,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        260,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        330,
+        39,
+        9
+      ],
+      [
+        0,
+        0,
+        0,
+        31,
+        363,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        438
+      ]
+    ]
+  },
+  "test": null,
+  "latency": null,
+  "hardware": {
+    "python": "3.12.10",
+    "torch": "2.14.1+cu130",
+    "os": "Windows-11-10.0.26300-SP0",
+    "cpu": "AMD Ryzen 7 7840HS w/ Radeon 780M Graphics",
+    "processor": "AMD64 Family 25 Model 116 Stepping 1, AuthenticAMD",
+    "cpu_count": 16,
+    "device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU"
+  },
+  "val_subjects": [
+    3,
+    15,
+    19,
+    22,
+    28,
+    29
+  ],
+  "protocol_override": false,
+  "smoke": false,
+  "tag": "tune-c1",
+  "counts": {
+    "train": 5276,
+    "val": 2076,
+    "test": 2947
+  }
+}
