@@ -1,4 +1,5 @@
-"""Confusion-matrix and training-curve figures for run folders and the report (BUILD_SPEC M2.1).
+"""Confusion-matrix, training-curve and cost trade-off figures for run folders and the report
+(BUILD_SPEC M2.1, PHASE3_SPEC 4.3).
 
 Figures are drawn on ``matplotlib.figure.Figure`` objects, never through ``pyplot``, so PNGs
 are rendered by the Agg backend without touching any global backend state (safe on headless
@@ -13,9 +14,11 @@ from pathlib import Path
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.figure import Figure
-from matplotlib.ticker import MaxNLocator
+from matplotlib.lines import Line2D
+from matplotlib.ticker import FuncFormatter, LogLocator, MaxNLocator, NullFormatter
 
 DPI = 200
+MAX_MARKER_AREA = 220.0   # pt^2, the largest model's marker in plot_cost_tradeoff
 
 # Validated default palette: categorical slots in fixed order (train blue and validation orange
 # in run curves; one slot per model in comparisons), the blue sequential ramp (steps 100, 250,
@@ -176,6 +179,71 @@ def plot_val_curves(curves: dict[str, Sequence[dict]], path: Path, slots: dict[s
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     fig.legend(fontsize=6.5, frameon=False, loc="outside upper center", ncol=min(len(curves), 5),
                labelcolor=INK_SECONDARY, handlelength=1.5)
+    if title:
+        fig.suptitle(title, fontsize=8, color=INK, x=0.01, ha="left")
+    return _save(fig, path)
+
+
+def plot_cost_tradeoff(points: Sequence[dict], path: Path, slots: dict[str, int] | None = None,
+                       title: str = "") -> Path:
+    """Save test macro-F1 against CPU latency as a PNG, one labelled point per model.
+
+    Each point has ``name``, ``latency_ms`` (x, log scale, must be positive), ``f1_mean`` and
+    ``f1_std`` (y with a vertical error bar; ``f1_std`` may be None) and ``params`` (marker
+    area proportional to it, the largest model at ``MAX_MARKER_AREA``). ``slots`` fixes each
+    model's palette slot as in ``plot_val_curves``. A point's label sits to its right, or to its
+    left when another point's marker or error bar is where the label would go. Returns ``path``.
+    """
+    if not points:
+        raise ValueError("no points to plot")
+    if any(p["latency_ms"] <= 0 for p in points):
+        raise ValueError("latency must be positive on a log axis")
+    names = [p["name"] for p in points]
+    slots = slots if slots is not None else {name: i for i, name in enumerate(names)}
+    if max(slots[name] for name in names) >= len(CATEGORICAL):
+        raise ValueError(f"at most {len(CATEGORICAL)} series; fold the rest into small multiples")
+    largest = max(p["params"] for p in points)
+    xs = [p["latency_ms"] for p in points]
+    x_limits = (min(xs) / 1.6, max(xs) * 2.6)          # room on the right for the labels
+    label_decades = 0.2 * np.log10(x_limits[1] / x_limits[0])     # about one label width
+    spans = [(p["f1_mean"] - (p["f1_std"] or 0), p["f1_mean"] + (p["f1_std"] or 0)) for p in points]
+    pad = 0.03 * (max(high for _, high in spans) - min(low for low, _ in spans))
+
+    def right_is_taken(p: dict) -> bool:
+        return any(0 < np.log10(q["latency_ms"] / p["latency_ms"]) < label_decades
+                   and low - pad <= p["f1_mean"] <= high + pad
+                   for q, (low, high) in zip(points, spans) if q is not p)
+
+    fig = Figure(figsize=(4.6, 3.0), facecolor=SURFACE, layout="constrained")
+    ax = fig.subplots()
+    _style_axes(ax, grid_axis="both")
+    ax.set_xscale("log")
+    ax.set_xlim(*x_limits)          # before any error bar: an empty log axis has a zero-width view
+    for p in points:
+        color = CATEGORICAL[slots[p["name"]]]
+        x, y = p["latency_ms"], p["f1_mean"]
+        if p["f1_std"]:
+            ax.errorbar(x, y, yerr=p["f1_std"], fmt="none", ecolor=color, elinewidth=1.0, capsize=2.5,
+                        capthick=1.0, zorder=2)
+        area = MAX_MARKER_AREA * p["params"] / largest
+        # Surface ring keeps the marker legible over its error bar and neighbouring points.
+        ax.scatter([x], [y], s=area, color=color, edgecolors=SURFACE, linewidths=1.0, zorder=3)
+        side = -1 if right_is_taken(p) else 1
+        ax.annotate(f"{p['name']} ({p['params'] / 1000:.0f}k)", xy=(x, y),
+                    xytext=(side * (np.sqrt(area) / 2 + 4), 0), textcoords="offset points", fontsize=6,
+                    color=INK_SECONDARY, va="center", ha="left" if side > 0 else "right")
+    ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1.0, 2.0, 5.0)))
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+    ax.xaxis.set_minor_formatter(NullFormatter())
+    ax.tick_params(axis="x", which="minor", length=0)
+    ax.set_xlabel("CPU latency, batch size 1, 1 thread (ms, log scale)", fontsize=7, color=INK_SECONDARY)
+    ax.set_ylabel("Test macro-F1 (mean ± std)", fontsize=7, color=INK_SECONDARY)
+    ax.text(0.99, 0.02, "marker area proportional to parameters", transform=ax.transAxes, ha="right",
+            va="bottom", fontsize=5.5, color=INK_MUTED)
+    handles = [Line2D([], [], linestyle="", marker="o", markersize=5, color=CATEGORICAL[slots[name]], label=name)
+               for name in names]
+    fig.legend(handles=handles, fontsize=6.5, frameon=False, loc="outside upper center", ncol=min(len(names), 5),
+               labelcolor=INK_SECONDARY, handletextpad=0.3)
     if title:
         fig.suptitle(title, fontsize=8, color=INK, x=0.01, ha="left")
     return _save(fig, path)
