@@ -218,6 +218,7 @@ def run_experiment(
     output_root: Path | str = RESULTS_ROOT,
     seed: int | None = None,
     no_profile: bool = False,
+    params_override: dict | None = None,
     verbose: bool = True,
 ) -> Path:
     """Train one model under the shared protocol and write its run folder; return the folder.
@@ -225,7 +226,9 @@ def run_experiment(
     ``smoke`` keeps 512 training windows, trains 2 epochs, measures latency at batch size 1
     with 2 warmup and 5 timed passes, and writes under ``<output_root>/_smoke/``. ``no_test``
     skips the test split (``"test": null``). ``seed`` replaces the base.yaml seed (see
-    ``apply_seed``). ``no_profile`` skips latency profiling (``"latency": null``). The folder
+    ``apply_seed``). ``no_profile`` skips latency profiling (``"latency": null``).
+    ``params_override`` replaces entries of ``model.params`` (used by tuning; recorded in
+    ``config.resolved.yaml``, and not a protocol override since the protocol is untouched). The folder
     is ``<output_root>/<model name>/<run_id>/`` with the files listed in BUILD_SPEC 8.2; a
     non-smoke run also writes ``predictions_val.csv`` and ``predictions_test.csv``. The tag
     ``final`` is only accepted for a config in ``configs/final/``.
@@ -236,6 +239,8 @@ def run_experiment(
                          f"scripts/tune.py), got {config}")
     cfg = load_config(config, allow_protocol_override=allow_protocol_override)
     apply_seed(cfg, seed, allow_protocol_override)
+    if params_override:
+        cfg["model"]["params"] = {**(cfg["model"].get("params") or {}), **params_override}
     name = cfg.get("name") or config.stem
     subset = None
     if smoke:
@@ -247,7 +252,7 @@ def run_experiment(
     except ValueError:
         config_file = str(config)
     cfg["run"] = {"config_file": config_file, "smoke": smoke, "no_test": no_test, "no_profile": no_profile,
-                  "subset": subset, "tag": tag}
+                  "subset": subset, "tag": tag, "params_override": params_override or None}
 
     git_sha, git_dirty = git_state()
     if git_dirty and not smoke:

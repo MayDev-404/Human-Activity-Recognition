@@ -1,0 +1,7 @@
+# Tuning grid for Model 3 (PHASE3_SPEC section 3): model.params only, 4 configurations.
+# The first value of each parameter is the Phase 2 default. Run: python scripts/tune.py --model bilstm
+model: bilstm
+base_config: configs/bilstm.yaml
+grid:
+  dropout: [0.3, 0.5]
+  pooling: [last, mean]

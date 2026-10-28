@@ -1,0 +1,7 @@
+# Tuning grid for Model 4 (PHASE3_SPEC section 3): model.params only, 4 configurations.
+# The first value of each parameter is the Phase 2 default. Run: python scripts/tune.py --model transformer
+model: transformer
+base_config: configs/transformer.yaml
+grid:
+  dropout: [0.1, 0.2]
+  dim_feedforward: [256, 128]

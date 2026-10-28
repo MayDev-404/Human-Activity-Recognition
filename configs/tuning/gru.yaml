@@ -1,0 +1,7 @@
+# Tuning grid for the GRU ablation (PHASE3_SPEC section 3): model.params only, 4 configurations.
+# The first value of each parameter is the Phase 2 default. Run: python scripts/tune.py --model gru
+model: gru
+base_config: configs/gru.yaml
+grid:
+  dropout: [0.3, 0.5]
+  pooling: [last, mean]
