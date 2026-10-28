@@ -425,6 +425,14 @@ def test_committed_meta_has_no_placeholders() -> None:
 
 
 def test_draft_build_of_the_repository_runs(tmp_path: Path) -> None:
-    """The repository builds as a draft at any stage; missing inputs become [MISSING: ...] markers."""
-    path = builder.main(["--draft", "--no-pdf", "--out-dir", str(tmp_path)])
+    """The repository builds as a draft at any stage; missing inputs become [MISSING: ...] markers.
+
+    What is already committed must be correct, though: every placeholder and citation in the committed
+    section and contribution files resolves against the committed results, with no em dash or table.
+    """
+    inputs = builder.Inputs(root=REPO_ROOT, draft=True)
+    path, _ = builder.build(inputs, builder.TEMPLATE, tmp_path, make_pdf=False)
     assert path.is_file() and path.name == "ICT4442_Final_Report_HAR_DRAFT.docx"
+    broken = [p for p in inputs.problems
+              if any(s in p for s in ("cannot resolve", "unknown citation key", "em dash", "markdown table"))]
+    assert broken == []
