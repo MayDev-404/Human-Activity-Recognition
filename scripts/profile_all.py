@@ -1,9 +1,10 @@
 """Profile every model config on this machine without training: parameters, size, latency.
 
-Writes results/profile_<label>.csv. Use a neutral machine label, not the hostname. In Phase 3
-this runs on one machine for the final cost comparison.
+Writes results/profile_<label>.csv. Use a neutral machine label, not the hostname. Each model
+uses configs/final/<model>.yaml when it exists, otherwise configs/<model>.yaml. In Phase 3 this
+runs once, in one process, on the final configs for the cost comparison (PHASE3_SPEC D4).
 
-Usage: python scripts/profile_all.py --label mayank-laptop
+Usage: python scripts/profile_all.py --label rtx4060-laptop
 """
 
 from __future__ import annotations

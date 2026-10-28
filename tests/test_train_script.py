@@ -12,7 +12,7 @@ import pytest
 import torch
 import yaml
 
-from har.train.runner import UNKNOWN_USER, make_run_id, run_by
+from har.train.runner import PREDICTION_FIELDS, STATUS, UNKNOWN_USER, make_run_id, run_by, status_label
 from har.train.trainer import HISTORY_FIELDS
 from har.utils.config import ProtocolError
 from har.utils.paths import CONFIGS, REPO_ROOT
@@ -24,10 +24,12 @@ RUN_FILES = {
     "classification_report_val.txt", "classification_report_test.txt", "best.pt",
 }
 TEST_FILES = {"confusion_test.png", "classification_report_test.txt"}
+PREDICTION_FILES = {"predictions_val.csv", "predictions_test.csv"}   # non-smoke runs only (PHASE3_SPEC D7)
 SCHEMA_KEYS = {
     "model", "run_id", "git_sha", "git_dirty", "run_by", "status", "representation",
     "params_trainable", "model_size_mb", "best_epoch", "epochs_run", "train_time_s",
     "mean_epoch_time_s", "val", "test", "latency", "hardware", "val_subjects", "protocol_override",
+    "seed",
 }
 SPLIT_KEYS = {"accuracy", "macro_f1", "per_class", "confusion"}
 
@@ -48,10 +50,16 @@ def _load_script():
 train_script = _load_script()
 
 
-def _config(tmp_path: Path, extra: str = "") -> Path:
-    path = tmp_path / "tiny.yaml"
+def _config(tmp_path: Path, extra: str = "", folder: str = "") -> Path:
+    path = tmp_path / folder / "tiny.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(TINY_CONFIG + extra, encoding="utf-8")
     return path
+
+
+def _predictions(path: Path) -> list[dict]:
+    with path.open(encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f))
 
 
 def _metrics(run_dir: Path) -> dict:
@@ -72,6 +80,7 @@ def test_smoke_run_writes_every_file_and_schema_key(tmp_path: Path) -> None:
     assert m["representation"] == "synthetic" and m["protocol_override"] is False
     assert m["params_trainable"] == 16 * 6 + 6
     assert m["smoke"] is True and "smoke" in m["status"]
+    assert m["seed"] == 42                                                       # base.yaml seed by default
     assert 1 <= m["best_epoch"] <= m["epochs_run"] <= 2
     assert set(m["latency"]) == {"cpu_bs1", "device_bs1"}            # smoke: batch size 1 only
     assert m["latency"]["cpu_bs1"]["threads"] == 1 and m["latency"]["cpu_bs1"]["iters"] == 5
@@ -103,6 +112,82 @@ def test_protocol_keys_need_the_override_flag_and_are_recorded(tmp_path: Path) -
     run_dir = train_script.main(["--config", str(config), "--smoke", "--allow-protocol-override",
                                  "--output-root", str(tmp_path)])
     assert _metrics(run_dir)["protocol_override"] is True
+
+
+@pytest.mark.parametrize("seed", [42, 43, 44])
+def test_final_seeds_are_not_protocol_overrides(tmp_path: Path, seed: int) -> None:
+    run_dir = train_script.main(["--config", str(_config(tmp_path)), "--smoke", "--seed", str(seed),
+                                 "--output-root", str(tmp_path)])
+    m = _metrics(run_dir)
+    assert m["seed"] == seed and m["protocol_override"] is False
+    resolved = yaml.safe_load((run_dir / "config.resolved.yaml").read_text(encoding="utf-8"))
+    assert resolved["seed"] == seed and resolved["final_seeds"] == [42, 43, 44]
+
+
+def test_unlisted_seed_needs_the_override_flag_and_is_recorded(tmp_path: Path) -> None:
+    args = ["--config", str(_config(tmp_path)), "--smoke", "--seed", "7", "--output-root", str(tmp_path)]
+    with pytest.raises(ProtocolError, match="final_seeds"):
+        train_script.main(args)
+    m = _metrics(train_script.main(args + ["--allow-protocol-override"]))
+    assert m["seed"] == 7 and m["protocol_override"] is True
+
+
+def test_the_seed_changes_the_run(tmp_path: Path) -> None:
+    """The synthetic data and batch order follow the seed, so seeds 43 and 44 train differently."""
+    def train_losses(seed: int) -> list[str]:
+        run_dir = train_script.main(["--config", str(_config(tmp_path)), "--smoke", "--seed", str(seed),
+                                     "--output-root", str(tmp_path)])
+        with (run_dir / "history.csv").open(encoding="utf-8", newline="") as f:
+            return [row["train_loss"] for row in csv.DictReader(f)]
+    assert train_losses(43) != train_losses(44)
+
+
+def test_no_profile_records_null_latency(tmp_path: Path) -> None:
+    run_dir = train_script.main(["--config", str(_config(tmp_path)), "--smoke", "--no-profile",
+                                 "--output-root", str(tmp_path)])
+    m = _metrics(run_dir)
+    assert m["latency"] is None and m["test"] is not None
+
+
+def test_status_label_follows_the_tag() -> None:
+    assert status_label("final", 43) == "final, tuned on validation, seed 43"
+    assert status_label("tune-c2", 42) == "tuning run, validation only"
+    assert status_label(None, 42) == status_label("lr check", 42) == STATUS     # interim runs unchanged
+    assert "smoke" in status_label("final", 42, smoke=True)
+
+
+def test_final_tag_needs_a_config_from_configs_final(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="configs/final"):
+        train_script.main(["--config", str(_config(tmp_path)), "--seed", "43", "--tag", "final",
+                           "--output-root", str(tmp_path)])
+    run_dir = train_script.main(["--config", str(_config(tmp_path, folder="final")), "--seed", "43",
+                                 "--tag", "final", "--no-profile", "--output-root", str(tmp_path / "out")])
+    m = _metrics(run_dir)
+    assert m["status"] == "final, tuned on validation, seed 43" and m["seed"] == 43
+    assert run_dir.name.endswith("_final") and m["tag"] == "final"
+
+
+def test_full_run_writes_predictions_in_loader_order(tmp_path: Path) -> None:
+    run_dir = train_script.main(["--config", str(_config(tmp_path)), "--no-profile", "--tag", "tune-c1",
+                                 "--output-root", str(tmp_path / "out")])
+    assert {p.name for p in run_dir.iterdir()} == RUN_FILES | PREDICTION_FILES
+    m = _metrics(run_dir)
+    assert m["status"] == "tuning run, validation only" and m["smoke"] is False
+    for split, n in (("val", 64), ("test", 64)):                    # synthetic bundle sizes
+        rows = _predictions(run_dir / f"predictions_{split}.csv")
+        assert tuple(rows[0]) == PREDICTION_FIELDS and [int(r["index"]) for r in rows] == list(range(n))
+        confusion = [[0] * 6 for _ in range(6)]
+        for r in rows:
+            confusion[int(r["y_true"])][int(r["y_pred"])] += 1
+        assert confusion == m[split]["confusion"]                    # same predictions as the metrics
+
+
+def test_no_test_full_run_writes_only_validation_predictions(tmp_path: Path) -> None:
+    run_dir = train_script.main(["--config", str(_config(tmp_path)), "--no-test", "--no-profile",
+                                 "--output-root", str(tmp_path / "out")])
+    names = {p.name for p in run_dir.iterdir()}
+    assert "predictions_val.csv" in names and "predictions_test.csv" not in names
+    assert not names & TEST_FILES
 
 
 def test_tag_and_repeated_runs_get_distinct_folders(tmp_path: Path) -> None:

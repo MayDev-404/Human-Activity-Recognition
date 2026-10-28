@@ -1,6 +1,8 @@
-"""Write results/summary.csv and results/summary.md and refresh the README results block.
+"""Write the results tables and refresh the README results block.
 
-For each model config, the full run with the best validation macro-F1 is selected.
+Interim: results/summary.csv and summary.md from the untagged runs (for each model, the run
+with the best validation macro-F1). Final (once runs tagged final exist): results/final_summary.csv
+and final_summary.md, mean and sample std over seeds 42, 43, 44; the README then shows this table.
 
 Usage: python scripts/make_results_table.py
 """

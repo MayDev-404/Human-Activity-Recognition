@@ -1,0 +1,7 @@
+# Tuning grid for Model 2 (PHASE3_SPEC section 3): model.params only, 4 configurations.
+# The first value of each parameter is the Phase 2 default. Run: python scripts/tune.py --model cnn1d
+model: cnn1d
+base_config: configs/cnn1d.yaml
+grid:
+  dropout: [0.5, 0.3]
+  kernel_sizes: [[5, 5, 5, 5, 3], [7, 7, 5, 5, 3]]
