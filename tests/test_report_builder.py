@@ -273,9 +273,10 @@ def test_final_build_refuses_missing_inputs(dummy_root: Path) -> None:
 
 # ---------------------------------------------------------------- stale results table guard
 
-def _run_folder(root: Path, rel_dir: str, override: bool = False) -> None:
+def _run_folder(root: Path, rel_dir: str, override: bool = False, tag: str | None = None) -> None:
     run_id = rel_dir.rsplit("/", 1)[-1]
-    _write(root, f"results/{rel_dir}/metrics.json", json.dumps({"run_id": run_id, "protocol_override": override}))
+    _write(root, f"results/{rel_dir}/metrics.json",
+           json.dumps({"run_id": run_id, "protocol_override": override, "tag": tag}))
 
 
 def test_run_started_parses_the_run_id() -> None:
@@ -299,6 +300,14 @@ def test_current_summary_passes_and_smoke_or_override_runs_are_ignored(dummy_roo
     _run_folder(dummy_root, "mlp/20000101-000000_abc1234")
     _run_folder(dummy_root, "_smoke/gru/20991231-235959_abc1234")
     _run_folder(dummy_root, "gru/20991231-235959_abc1234", override=True)
+    assert _build(dummy_root).is_file()
+
+
+def test_phase3_tagged_runs_do_not_make_the_interim_summary_stale(dummy_root: Path) -> None:
+    """The interim table only holds untagged runs, so final runs newer than it must not block the build."""
+    _run_folder(dummy_root, "mlp/20000101-000000_abc1234")
+    _run_folder(dummy_root, "mlp/20991231-235959_abc1234_final", tag="final")
+    _run_folder(dummy_root, "gru/20991231-235959_abc1234_final", tag="final")  # no gru row needed
     assert _build(dummy_root).is_file()
 
 

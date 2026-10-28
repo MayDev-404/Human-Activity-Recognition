@@ -251,6 +251,21 @@ def find_paragraph(doc: DocxDocument, prefix: str) -> Paragraph:
     raise BuildError(f"template paragraph starting with {prefix!r} not found")
 
 
+def fill_cover(doc: DocxDocument, title: str, month_year: str, members: list[Member], report_on: str) -> None:
+    """Fill the template cover: title, ``report_on`` (e.g. ``Interim report on``), students and month."""
+    set_paragraph_text(find_paragraph(doc, "<TITLE OF THE PROJECT"), title)
+    set_paragraph_text(find_paragraph(doc, "Synopsis/Interim/Final report on"), report_on)
+    name_paragraphs = [p for p in doc.paragraphs if p.text.strip().startswith("<NAME OF THE STUDENT-")]
+    if len(name_paragraphs) != len(members):
+        raise BuildError(f"template has {len(name_paragraphs)} student lines but team.yaml lists {len(members)}")
+    for paragraph, member in zip(name_paragraphs, members):
+        set_paragraph_text(paragraph, f"{member.name} - {member.reg_no}")
+    month = next((p for p in doc.paragraphs if p.text.strip().startswith("<") and "MONTH AND YEAR" in p.text), None)
+    if month is None:
+        raise BuildError("template paragraph for the month and year not found")
+    set_paragraph_text(month, month_year)
+
+
 class Cursor:
     """Inserts new body content one element after another, starting after ``anchor``."""
 
@@ -462,8 +477,8 @@ REGENERATE = "M2 must rerun python scripts/make_results_table.py and commit the 
 def full_runs(inputs: Inputs) -> dict[str, list[Path]]:
     """Full run folders per model (``results/<model>/<run_id>/metrics.json``).
 
-    Smoke runs (folders starting with ``_``) and protocol-override runs are skipped: they never
-    get a row in results/summary.csv.
+    Smoke runs (folders starting with ``_``), protocol-override runs and tagged runs (Phase 3
+    final runs) are skipped: they never get a row in results/summary.csv.
     """
     runs: dict[str, list[Path]] = {}
     for metrics in sorted(inputs.path("results").glob("*/*/metrics.json")):
@@ -471,7 +486,8 @@ def full_runs(inputs: Inputs) -> dict[str, list[Path]]:
         if model_dir.name.startswith("_"):
             continue
         try:
-            if json.loads(metrics.read_text(encoding="utf-8")).get("protocol_override"):
+            run = json.loads(metrics.read_text(encoding="utf-8"))
+            if run.get("protocol_override") or run.get("tag"):
                 continue
         except (OSError, ValueError):
             pass  # an unreadable metrics.json still counts as a run that needs a summary row
@@ -633,18 +649,7 @@ class ReportBuilder:
     # ---- cover and template surgery
 
     def fill_cover(self, meta: dict[str, Any], members: list[Member]) -> None:
-        set_paragraph_text(find_paragraph(self.doc, "<TITLE OF THE PROJECT"), meta["title"])
-        set_paragraph_text(find_paragraph(self.doc, "Synopsis/Interim/Final report on"), "Interim report on")
-        name_paragraphs = [p for p in self.doc.paragraphs if p.text.strip().startswith("<NAME OF THE STUDENT-")]
-        if len(name_paragraphs) != len(members):
-            raise BuildError(f"template has {len(name_paragraphs)} student lines but team.yaml lists {len(members)}")
-        for paragraph, member in zip(name_paragraphs, members):
-            set_paragraph_text(paragraph, f"{member.name} - {member.reg_no}")
-        month = next((p for p in self.doc.paragraphs
-                      if p.text.strip().startswith("<") and "MONTH AND YEAR" in p.text), None)
-        if month is None:
-            raise BuildError("template paragraph for the month and year not found")
-        set_paragraph_text(month, meta["month_year"])
+        fill_cover(self.doc, meta["title"], meta["month_year"], members, "Interim report on")
 
     def remove_part_a_and_c(self) -> None:
         body = self.doc.element.body
