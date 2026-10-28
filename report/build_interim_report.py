@@ -1,7 +1,7 @@
 """Build the Phase 2 interim report (Report Template Part B) from files in the repository.
 
     python report/build_interim_report.py            # final build; refuses placeholders and missing inputs
-    python report/build_interim_report.py --draft    # allow FILL_ME, missing reg. nos. and missing inputs
+    python report/build_interim_report.py --draft    # allow meta placeholders, missing reg. nos. and missing inputs
     python report/build_interim_report.py --root DIR --no-pdf   # read inputs from another tree (dummy runs)
 
 Inputs (BUILD_SPEC 10.2 and 10.3): the official template, report/interim/meta.yaml, configs/team.yaml,
@@ -46,7 +46,8 @@ from har.utils.paths import REPO_ROOT
 
 TEMPLATE = REPO_ROOT / "report" / "template" / "ICT_4442_Mini_Project_Report_Template.docx"
 OUTPUT_STEM = "ICT4442_Interim_Report_HAR"
-PLACEHOLDER = "FILL_ME"
+PLACEHOLDER_WORDS = frozenset({"", "FILL_ME", "TBD"})   # meta values that mean "not filled in yet"
+ANGLE_PLACEHOLDER_RE = re.compile(r"<[^<>]*>")         # e.g. "<team_no>"
 
 BODY_PT = 10.5          # the template's Part B text size (its label lines are 10.5 pt)
 TABLE_PT: float | None = None   # None keeps the template's own table text size
@@ -358,11 +359,34 @@ def load_members(inputs: Inputs) -> list[Member]:
     return members
 
 
+def is_placeholder(value: Any) -> bool:
+    """True for an unfilled value: missing or empty, ``FILL_ME``, ``TBD`` or any ``<...>`` placeholder."""
+    text = "" if value is None else str(value).strip()
+    return text.upper() in PLACEHOLDER_WORDS or bool(ANGLE_PLACEHOLDER_RE.search(text))
+
+
+def placeholder_fields(value: Any, path: str = "") -> list[str]:
+    """Paths (``team_no``, ``models[0].label``) of every placeholder value, looking inside dicts and lists."""
+    if isinstance(value, dict):
+        items = [(f"{path}.{k}" if path else str(k), v) for k, v in value.items()]
+    elif isinstance(value, list):
+        items = [(f"{path}[{i}]", v) for i, v in enumerate(value)]
+    else:
+        return [path] if is_placeholder(value) else []
+    if not items:
+        return [path]  # an empty list or mapping is an empty value too
+    return [found for sub_path, item in items for found in placeholder_fields(item, sub_path)]
+
+
 def load_meta(inputs: Inputs) -> dict[str, Any]:
+    """meta.yaml. Any placeholder value is fatal for a final build; a draft shows team_no as TBD."""
     meta = load_yaml_file(inputs.path("report", "interim", "meta.yaml"))
-    if str(meta.get("team_no", PLACEHOLDER)).strip() in ("", PLACEHOLDER):
-        if not inputs.draft:
-            raise BuildError("team_no is still FILL_ME in report/interim/meta.yaml; set it (or pass --draft)")
+    meta.setdefault("team_no", None)
+    unfilled = placeholder_fields(meta)
+    if unfilled:
+        inputs.problem("report/interim/meta.yaml still has placeholder values (empty, FILL_ME, TBD or <...>) in: "
+                       + ", ".join(unfilled))
+    if "team_no" in unfilled:
         meta["team_no"] = "TBD"
     return meta
 

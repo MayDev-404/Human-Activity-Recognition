@@ -66,8 +66,6 @@ python scripts/train.py --config configs/mlp.yaml            # full run, written
 python scripts/make_results_table.py                         # results/summary.csv, results/summary.md and the block below
 ```
 
-The download, training and results scripts are added by later tasks (see [docs/tasks/](docs/tasks/)); until they land, `pytest -q` is the check.
-
 Protocol, shared by every model and stored only in `configs/base.yaml`: Adam (lr 1e-3), batch size 64, cross-entropy loss, at most 50 epochs with early stopping on validation macro-F1 (patience 10, best weights restored), gradient clipping at norm 1.0, seed 42, augmentation off. Add `--no-test` while debugging. Models and runs are selected on the validation split only; the test split is evaluated once, on the selected checkpoint.
 
 ## Results

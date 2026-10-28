@@ -86,3 +86,15 @@ sets the repo-local git identity (`git config user.name` / `user.email`, never -
 to their own, and Claude confirms it with them before any commit. Pushing and PRs may use
 whichever gh account is logged in; commit authorship comes from the commit email. Never
 commit while the identity set belongs to someone other than the person doing the work.
+
+## 8. Phase 3 amendments (agreed by all three; see docs/PHASE3_SPEC.md section 1)
+
+- Final runs use seeds 42, 43 and 44, set only with `scripts/train.py --seed`; the allowed
+  list is `final_seeds` in configs/base.yaml. These seeds are not protocol overrides.
+- Tuning changes only `model.params`, using the grids in PHASE3_SPEC section 3, with
+  validation only (`--no-test`). The shared training protocol is unchanged for all models.
+- Every Phase 3 PR is approved by a different member, using their own gh account, before
+  it is merged.
+- Phase 3 tasks and the turn order are in docs/PHASE3_SPEC.md sections 2 and 7.
+- The team shares one laptop: at each session start, confirm the repo-local git identity
+  and the active gh account belong to the person at the keyboard before any commit.
