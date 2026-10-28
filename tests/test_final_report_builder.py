@@ -52,7 +52,9 @@ SPECIAL = {  # extra text per section file, on top of filler words within the bu
     "5_setup.md": "Validation subjects {{split:val_subjects}}; MLP config {{tuning:mlp:config_id}} in {{table:tuning}}.",
     "6a_results.md": ("CNN {{final:cnn1d:test_macro_f1}} (mean {{final:cnn1d:test_macro_f1.mean}}), "
                       "MLP accuracy {{final:mlp:test_acc}}, see {{table:final}} and {{fig:cost_tradeoff}}."),
-    "6b_error_analysis.md": "Total errors {{analysis:errors.total}}, share {{analysis:errors.share}}.",
+    "6b_error_analysis.md": ("Total errors {{analysis:errors.total}}, share {{analysis:errors.share}}. "
+                             "As a percentage {{analysis:errors.share|%}}; all wrong {{analysis:errors.all_wrong|.1f}}, "
+                             "mean {{analysis:errors.all_wrong.mean|.0f}}."),
 }
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
@@ -139,7 +141,8 @@ def dummy_root(tmp_path: Path) -> Path:
             for i, (d, w) in enumerate([(0.1, 8), (0.1, 16), (0.2, 8), (0.2, 16)])])
     _csv(root, "results/analysis/per_class_f1.csv", ["model", "class", "f1_mean", "f1_std"],
          [{"model": m, "class": c, "f1_mean": 0.4, "f1_std": 0.01} for m in MODELS for c in ACTIVITY_NAMES])
-    _write(root, "results/analysis/error_summary.json", json.dumps({"errors": {"total": 12, "share": 0.25}}))
+    _write(root, "results/analysis/error_summary.json", json.dumps(
+        {"errors": {"total": 12, "share": 0.25, "all_wrong": {"mean": 45.6667, "std": 5.1316}}}))
     for rel in ("docs/figures/class_distribution.png", "results/figures/final_val_curves.png",
                 "results/figures/cost_tradeoff.png", "results/analysis/per_class_f1.png",
                 "results/analysis/error_overlap.png", "results/figures/confusion_test_cnn1d_final.png"):
@@ -190,6 +193,18 @@ def test_format_value() -> None:
     assert builder.format_value(0.9412, 0.0041, acc, "std") == "0.4%"
     assert builder.format_value(1.25, None, f1, None) == "1.250"   # single-process latency has no std
     assert builder.format_value(None, None, f1, None) is None
+
+
+def test_format_analysis() -> None:
+    pair = {"mean": 45.6667, "std": 5.1316}
+    assert builder.format_analysis(0.978, "%") == "97.8%"
+    assert builder.format_analysis(0.35612, ".2f") == "0.36"
+    assert builder.format_analysis(pair, ".1f") == "45.7 ± 5.1"
+    assert builder.format_analysis(pair) == "45.667 ± 5.132"
+    assert builder.format_analysis({"mean": 0.5, "std": None}, "%") == "50.0%"   # one seed: no std
+    assert builder.format_analysis(12) == "12" and builder.format_analysis([3, 15]) == "3, 15"
+    for value, spec in ((0.25, "pct"), (0.25, ".4f"), ("SITTING", ".1f"), ({"a": 1}, "")):
+        assert builder.format_analysis(value, spec) is None
 
 
 def test_word_count_ignores_citations_and_counts_placeholders_once() -> None:
@@ -285,7 +300,7 @@ def test_placeholders_are_resolved(dummy_root: Path) -> None:
     text = _all_text(Document(str(_build(dummy_root))))
     assert "CNN 0.533 ± 0.004 (mean 0.533), MLP accuracy 61.2 ± 0.3%, see Table I and Fig. 3." in text
     assert "Validation subjects 3, 15, 19, 22, 28, 29; MLP config c2 in Table II." in text
-    assert "Total errors 12, share 0.250." in text
+    assert "Total errors 12, share 0.250. As a percentage 25.0%; all wrong 45.7 ± 5.1, mean 46." in text
     assert "{{" not in text and "[@" not in text and "MISSING" not in text
 
 

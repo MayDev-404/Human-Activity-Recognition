@@ -57,7 +57,7 @@ Every result number in a section file is a placeholder that the builder fills fr
 - `<model>` is one of `mlp`, `cnn1d`, `bilstm`, `gru`, `transformer`.
 - `final` fields: `val_macro_f1`, `test_acc`, `test_macro_f1`, `train_time_s`, `cpu_latency_bs1_ms`, `params` (also `val_acc`). By default the builder prints mean ± sample standard deviation over the three seeds (for example `0.xxx ± 0.xxx`; `test_acc` as `xx.x ± x.x%`). Add `.mean` or `.std` for a single value: `{{final:cnn1d:test_macro_f1.mean}}`. The single-process CPU latency has no std, so it prints the mean alone.
 - `tuning` fields: any column of `tuning_summary.csv`, for example `config_id`, a grid parameter such as `dropout`, `params`, `val_macro_f1` (`0.xxx`), `val_acc` (`xx.x%`), `best_epoch`.
-- `analysis` keys: dotted paths into `error_summary.json` (a list index is a number, e.g. `pairs.0.jaccard`). Integers print as they are, other numbers with 3 decimals, lists comma-separated.
+- `analysis` keys: dotted paths into `error_summary.json` (a list index is a number, e.g. `overlap.pairs.0.jaccard`). Integers print as they are, other numbers with 3 decimals, lists comma-separated, and a `{mean, std}` pair as `mean ± std`. An optional format follows a `|`: `.0f` to `.3f` for the number of decimals, or `%` for a fraction as a percentage with one decimal. For example `{{analysis:overlap.all_wrong|.1f}}` gives `xx.x ± x.x` and `{{analysis:overlap.all_wrong_sitting_standing_share|%}}` gives `xx.x%`.
 - `split` fields: `seed`, `n_val_subjects`, `val_subjects`, `train_subjects`, `test_subjects`.
 
 ## Tables and figures

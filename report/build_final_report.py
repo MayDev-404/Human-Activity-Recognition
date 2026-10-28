@@ -419,11 +419,12 @@ class Resolver:
         return row[name] or None
 
     def analysis(self, arg: str) -> str | None:
-        """``<dotted.key>`` from results/analysis/error_summary.json."""
+        """``<dotted.key>[|<format>]`` from results/analysis/error_summary.json (see ``format_analysis``)."""
+        key, _, spec = (s.strip() for s in arg.partition("|"))
         value: Any = self.data.analysis
-        for key in arg.split("."):
-            value = value[int(key)] if isinstance(value, list) else value[key]
-        return format_scalar(value)
+        for name in key.split("."):
+            value = value[int(name)] if isinstance(value, list) else value[name]
+        return format_analysis(value, spec)
 
     def split(self, arg: str) -> str | None:
         """``<field>`` from configs/split.json."""
@@ -444,6 +445,29 @@ def format_scalar(value: Any) -> str | None:
     if isinstance(value, float):
         return str(int(value)) if value.is_integer() and abs(value) >= 1 else f"{value:.3f}"
     return str(value)
+
+
+def format_analysis(value: Any, spec: str = "") -> str | None:
+    """An error_summary.json value, optionally with a format after ``|``.
+
+    ``spec`` is ``.0f`` to ``.3f`` (decimals) or ``%`` (a fraction as a percentage with one decimal):
+    ``0.978|%`` gives ``97.8%``. A ``{"mean", "std"}`` pair prints as ``45.7 ± 5.1`` (``.3f`` without a
+    ``spec``). Without a ``spec`` other values print as ``format_scalar`` does. None for an unknown
+    ``spec`` or a value it cannot format.
+    """
+    if spec == "%":
+        fmt: tuple[str, float, str] | None = (".1f", 100, "%")
+    else:
+        fmt = (spec or ".3f", 1, "") if re.fullmatch(r"(\.[0-3]f)?", spec) else None
+    if fmt is None:
+        return None
+    if isinstance(value, dict) and {"mean", "std"} <= set(value):
+        return format_value(_float(value["mean"]), _float(value["std"]), fmt, None)
+    if not spec:
+        return format_scalar(value)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return format_value(float(value), None, fmt, None)
 
 
 # ---------------------------------------------------------------- docx: page setup and formatting
