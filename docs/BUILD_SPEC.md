@@ -146,10 +146,10 @@ Models can be written and unit-tested **before** the data and harness are ready 
 
 ## 3. Repository layout and file ownership
 
-Repo name: `har-dl-comparison`.
+Repository: `MayDev-404/Human-Activity-Recognition` (https://github.com/MayDev-404/Human-Activity-Recognition).
 
 ```
-har-dl-comparison/
+Human-Activity-Recognition/
 ├── CLAUDE.md                              M1 (scaffold)
 ├── README.md                              M1; results block rewritten by M2's script
 ├── pyproject.toml                         M1
@@ -272,7 +272,7 @@ Install `gh` from https://cli.github.com, then `gh auth login` with **your own**
 
 1. Send Mayank your GitHub username.
 2. Accept the invite (email or https://github.com/notifications).
-3. `git clone https://github.com/<mayank-username>/har-dl-comparison.git && cd har-dl-comparison`
+3. `git clone https://github.com/MayDev-404/Human-Activity-Recognition.git && cd Human-Activity-Recognition`
 4. Activate the venv, install (4.1), `pytest -q`.
 
 ---
