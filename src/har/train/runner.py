@@ -1,8 +1,8 @@
 """One end-to-end training run: config -> data -> fit -> evaluate -> profile -> run folder.
 
 Implements BUILD_SPEC M2.4 and the run folder of section 8.2, with the Phase 3 additions of
-PHASE3_SPEC 4.1 (``--seed``). ``scripts/train.py`` only parses the command line and calls
-``run_experiment``.
+PHASE3_SPEC 4.1 (``--seed``, ``--no-profile``, status labels from the tag, per-window
+predictions). ``scripts/train.py`` only parses the command line and calls ``run_experiment``.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from types import ModuleType
 
+import numpy as np
 import torch
 import yaml
 
@@ -32,6 +33,11 @@ from har.utils.seed import set_seed
 
 STATUS = "preliminary, untuned, single seed"
 SMOKE_STATUS = "smoke test, not a result"
+TUNING_STATUS = "tuning run, validation only"
+FINAL_TAG = "final"           # Phase 3 final runs (PHASE3_SPEC D3)
+TUNING_TAG_PREFIX = "tune"    # tuning runs are tagged tune-c<i> (PHASE3_SPEC 4.1 item 5)
+FINAL_CONFIG_DIR = "final"    # configs/final/<model>.yaml, written by scripts/tune.py
+PREDICTION_FIELDS = ("index", "y_true", "y_pred")
 SMOKE_DIR = "_smoke"
 SMOKE_SUBSET = 512        # training windows kept by --smoke
 SMOKE_EPOCHS = 2
@@ -83,6 +89,17 @@ def make_run_id(git_sha: str, tag: str | None = None, now: datetime | None = Non
     if tag:
         run_id += "_" + re.sub(r"[^A-Za-z0-9._-]+", "-", tag.strip())
     return run_id
+
+
+def status_label(tag: str | None, seed: int, smoke: bool = False) -> str:
+    """``status`` for metrics.json: smoke, final (tag ``final``), tuning (tag ``tune...``) or preliminary."""
+    if smoke:
+        return SMOKE_STATUS
+    if tag == FINAL_TAG:
+        return f"final, tuned on validation, seed {seed}"
+    if tag and tag.startswith(TUNING_TAG_PREFIX):
+        return TUNING_STATUS
+    return STATUS
 
 
 def apply_seed(cfg: dict, seed: int | None, allow_protocol_override: bool = False) -> None:
@@ -145,15 +162,26 @@ def _new_run_dir(parent: Path, run_id: str) -> tuple[Path, str]:
     return parent / candidate, candidate
 
 
+def write_predictions(y_true: np.ndarray, y_pred: np.ndarray, path: Path) -> Path:
+    """One row per window (``index, y_true, y_pred``) in loader order; val and test loaders are not shuffled."""
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(PREDICTION_FIELDS)
+        writer.writerows(zip(range(len(y_true)), y_true.tolist(), y_pred.tolist()))
+    return path
+
+
 def _evaluate(model: torch.nn.Module, bundle: DataBundle, split: str, device: torch.device,
-              run_dir: Path, title: str) -> dict:
-    """Metrics for one split, plus its confusion-matrix PNG and text classification report."""
+              run_dir: Path, title: str, save_predictions: bool) -> dict:
+    """Metrics for one split, its confusion-matrix PNG and text report, and optionally its predictions CSV."""
     y_true, y_pred, _ = predict(model, getattr(bundle, split), device)
     metrics = compute_metrics(y_true, y_pred, bundle.class_names)
     plot_confusion(metrics["confusion"], bundle.class_names, run_dir / f"confusion_{split}.png",
                    title=f"{title}: {'validation' if split == 'val' else 'test'} set")
     report = classification_report_text(y_true, y_pred, bundle.class_names)
     (run_dir / f"classification_report_{split}.txt").write_text(report, encoding="utf-8")
+    if save_predictions:
+        write_predictions(y_true, y_pred, run_dir / f"predictions_{split}.csv")
     return metrics
 
 
@@ -175,7 +203,7 @@ def _summary_line(metrics: dict, run_dir: Path) -> str:
         parts.append(f"test acc {metrics['test']['accuracy']:.4f} macro-F1 {metrics['test']['macro_f1']:.4f}")
     parts.append(f"best epoch {metrics['best_epoch']}/{metrics['epochs_run']}")
     parts.append(f"train {metrics['train_time_s']:.1f}s")
-    if metrics["latency"].get("cpu_bs1"):
+    if metrics["latency"] and metrics["latency"].get("cpu_bs1"):
         parts.append(f"cpu bs1 {metrics['latency']['cpu_bs1']['mean_ms']:.3f} ms")
     return " | ".join(parts) + f" -> {run_dir}"
 
@@ -189,6 +217,7 @@ def run_experiment(
     tag: str | None = None,
     output_root: Path | str = RESULTS_ROOT,
     seed: int | None = None,
+    no_profile: bool = False,
     verbose: bool = True,
 ) -> Path:
     """Train one model under the shared protocol and write its run folder; return the folder.
@@ -196,10 +225,15 @@ def run_experiment(
     ``smoke`` keeps 512 training windows, trains 2 epochs, measures latency at batch size 1
     with 2 warmup and 5 timed passes, and writes under ``<output_root>/_smoke/``. ``no_test``
     skips the test split (``"test": null``). ``seed`` replaces the base.yaml seed (see
-    ``apply_seed``). The folder is ``<output_root>/<model name>/<run_id>/`` with the files
-    listed in BUILD_SPEC 8.2.
+    ``apply_seed``). ``no_profile`` skips latency profiling (``"latency": null``). The folder
+    is ``<output_root>/<model name>/<run_id>/`` with the files listed in BUILD_SPEC 8.2; a
+    non-smoke run also writes ``predictions_val.csv`` and ``predictions_test.csv``. The tag
+    ``final`` is only accepted for a config in ``configs/final/``.
     """
     config = Path(config)
+    if tag == FINAL_TAG and not smoke and config.resolve().parent.name != FINAL_CONFIG_DIR:
+        raise ValueError(f"--tag {FINAL_TAG} is for configs/{FINAL_CONFIG_DIR}/<model>.yaml (written by "
+                         f"scripts/tune.py), got {config}")
     cfg = load_config(config, allow_protocol_override=allow_protocol_override)
     apply_seed(cfg, seed, allow_protocol_override)
     name = cfg.get("name") or config.stem
@@ -212,7 +246,8 @@ def run_experiment(
         config_file = config.resolve().relative_to(REPO_ROOT).as_posix()
     except ValueError:
         config_file = str(config)
-    cfg["run"] = {"config_file": config_file, "smoke": smoke, "no_test": no_test, "subset": subset, "tag": tag}
+    cfg["run"] = {"config_file": config_file, "smoke": smoke, "no_test": no_test, "no_profile": no_profile,
+                  "subset": subset, "tag": tag}
 
     git_sha, git_dirty = git_state()
     if git_dirty and not smoke:
@@ -229,9 +264,9 @@ def run_experiment(
     parent = Path(output_root) / SMOKE_DIR / name if smoke else Path(output_root) / name
     run_dir, run_id = _new_run_dir(parent, make_run_id(git_sha, tag))
 
-    val = _evaluate(model, bundle, "val", device, run_dir, name)
-    test = None if no_test else _evaluate(model, bundle, "test", device, run_dir, name)
-    latency = _profile(model, bundle.input_shape, device, cfg["eval"])
+    val = _evaluate(model, bundle, "val", device, run_dir, name, save_predictions=not smoke)
+    test = None if no_test else _evaluate(model, bundle, "test", device, run_dir, name, save_predictions=not smoke)
+    latency = None if no_profile else _profile(model, bundle.input_shape, device, cfg["eval"])
 
     metrics = {
         "model": name,
@@ -239,7 +274,7 @@ def run_experiment(
         "git_sha": git_sha,
         "git_dirty": git_dirty,
         "run_by": who,
-        "status": SMOKE_STATUS if smoke else STATUS,
+        "status": status_label(tag, cfg["seed"], smoke),
         "seed": cfg["seed"],
         "representation": cfg["data"]["representation"],
         "params_trainable": count_params(model),

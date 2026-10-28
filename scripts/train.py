@@ -23,6 +23,7 @@ def main(argv: list[str] | None = None) -> Path:
     parser.add_argument("--smoke", action="store_true",
                         help="512 training windows, 2 epochs, quick latency; writes under results/_smoke/")
     parser.add_argument("--no-test", action="store_true", help="skip the test split (use while debugging)")
+    parser.add_argument("--no-profile", action="store_true", help="skip latency profiling (tuning runs)")
     parser.add_argument("--allow-protocol-override", action="store_true",
                         help="allow train/seed keys in the model config (Phase 3 tuning only; recorded)")
     parser.add_argument("--seed", type=int,
@@ -38,6 +39,7 @@ def main(argv: list[str] | None = None) -> Path:
         tag=args.tag,
         output_root=args.output_root,
         seed=args.seed,
+        no_profile=args.no_profile,
     )
 
 
