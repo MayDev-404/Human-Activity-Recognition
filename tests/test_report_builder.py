@@ -222,6 +222,49 @@ def test_final_build_refuses_placeholders_but_draft_builds(dummy_root: Path) -> 
     assert "Team TBD:" in text and "Reg. No. TBD" in text
 
 
+@pytest.mark.parametrize("value", [None, "", "  ", "FILL_ME", "TBD", "tbd", "<team_no>", "Team <n> of 20"])
+def test_is_placeholder(value: object) -> None:
+    assert builder.is_placeholder(value)
+
+
+@pytest.mark.parametrize("value", ["15", 15, "October 2026", "auto", "MLP (engineered features)"])
+def test_filled_values_are_not_placeholders(value: object) -> None:
+    assert not builder.is_placeholder(value)
+
+
+@pytest.mark.parametrize("old, new, field", [
+    ('team_no: "99"', 'team_no: ""', "team_no"),
+    ('team_no: "99"', 'team_no: "TBD"', "team_no"),
+    ('team_no: "99"', 'team_no: "<team_no>"', "team_no"),
+    ('team_no: "99"', "", "team_no"),                                  # key missing
+    ('month_year: "October 2026"', 'month_year: "<MONTH AND YEAR>"', "month_year"),
+    ('title_status: "Confirmed from Synopsis"', "title_status:", "title_status"),
+    ('label: "MLP (engineered features)"', 'label: "<label>"', "models[0].label"),
+])
+def test_final_build_refuses_any_meta_placeholder(dummy_root: Path, old: str, new: str, field: str) -> None:
+    meta = dummy_root / "report/interim/meta.yaml"
+    text = meta.read_text(encoding="utf-8")
+    assert old in text
+    meta.write_text(text.replace(old, new, 1), encoding="utf-8")
+    with pytest.raises(builder.BuildError, match=re.escape(field)):
+        builder.load_meta(builder.Inputs(root=dummy_root, draft=False))
+    draft = builder.Inputs(root=dummy_root, draft=True)
+    builder.load_meta(draft)
+    assert len(draft.problems) == 1 and field in draft.problems[0]
+
+
+def test_draft_shows_a_placeholder_team_no_as_tbd(dummy_root: Path) -> None:
+    meta = dummy_root / "report/interim/meta.yaml"
+    meta.write_text(_set_meta(meta.read_text(encoding="utf-8"), "team_no", '"<team_no>"'), encoding="utf-8")
+    assert builder.load_meta(builder.Inputs(root=dummy_root, draft=True))["team_no"] == "TBD"
+
+
+def test_committed_meta_has_no_placeholders() -> None:
+    """The real report/interim/meta.yaml must pass a final (non-draft) build."""
+    meta = builder.load_meta(builder.Inputs(root=REPO_ROOT, draft=False))
+    assert builder.placeholder_fields(meta) == []
+
+
 def test_final_build_refuses_missing_inputs(dummy_root: Path) -> None:
     (dummy_root / "report/interim/sections/observations.md").unlink()
     with pytest.raises(builder.BuildError, match="observations.md"):
