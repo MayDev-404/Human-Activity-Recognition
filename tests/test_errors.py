@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import importlib.util
 import json
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -67,9 +68,13 @@ def _configs(tmp_path: Path, names=tuple(ERRORS)) -> Path:
     return configs
 
 
+def _run_dir(results: Path, model: str, seed: int) -> Path:
+    return results / model / f"20261028-1{seed}000_abc1234_final"
+
+
 def _final_run(results: Path, model: str, seed: int, y_pred: np.ndarray, y_true: np.ndarray = Y_TRUE) -> Path:
     """A final run folder with metrics.json (test metrics from compute_metrics) and predictions_test.csv."""
-    run_dir = results / model / f"20261028-1{seed}000_abc1234_final"
+    run_dir = _run_dir(results, model, seed)
     run_dir.mkdir(parents=True)
     test = compute_metrics(y_true, y_pred, ACTIVITY_NAMES)
     metrics = {"model": model, "run_id": run_dir.name, "run_by": "Test Person", "representation": "raw",
@@ -181,8 +186,7 @@ def test_partly_shared_cells(tmp_path: Path) -> None:
 
 def test_fails_when_predictions_do_not_match_the_confusion_matrix(tmp_path: Path) -> None:
     results, configs = _results(tmp_path), _configs(tmp_path)
-    run_dir = next((results / "gru").iterdir())
-    path = run_dir / "predictions_test.csv"
+    path = _run_dir(results, "gru", 43) / "predictions_test.csv"
     path.write_text(path.read_text(encoding="utf-8").replace("\n1,0,0\n", "\n1,0,1\n"), encoding="utf-8")
     with pytest.raises(ValueError, match="does not reproduce"):
         load_final_predictions(results, configs)
@@ -191,10 +195,7 @@ def test_fails_when_predictions_do_not_match_the_confusion_matrix(tmp_path: Path
 def test_fails_when_runs_disagree_on_the_test_labels(tmp_path: Path) -> None:
     results, configs = _results(tmp_path), _configs(tmp_path)
     shuffled = Y_TRUE[::-1].copy()
-    run_dir = next((results / "gru").iterdir())
-    for name in ("metrics.json", "predictions_test.csv"):
-        (run_dir / name).unlink()
-    run_dir.rmdir()
+    shutil.rmtree(_run_dir(results, "gru", 42))       # replace seed 42 by a run on reordered test windows
     _final_run(results, "gru", 42, shuffled, y_true=shuffled)
     with pytest.raises(ValueError, match="test labels differ"):
         load_final_predictions(results, configs)
@@ -208,7 +209,7 @@ def test_fails_unless_every_model_has_its_final_runs(tmp_path: Path) -> None:
 
 def test_index_column_must_be_in_order(tmp_path: Path) -> None:
     results, configs = _results(tmp_path), _configs(tmp_path)
-    path = next((results / "mlp").iterdir()) / "predictions_test.csv"
+    path = _run_dir(results, "mlp", 44) / "predictions_test.csv"
     lines = path.read_text(encoding="utf-8").splitlines()
     lines[1], lines[2] = lines[2], lines[1]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
