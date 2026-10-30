@@ -94,7 +94,3 @@ Final results: mean ± sample std over seeds 42, 43, 44 of the validation-select
 
 CPU latency (batch size 1, single thread) marked (single process) comes from one run of scripts/profile_all.py on rtx4060-laptop (results/profile_rtx4060-laptop.csv). All final runs report the same hardware (GPU NVIDIA GeForce RTX 4060 Laptop GPU, CPU AMD Ryzen 7 7840HS w/ Radeon 780M Graphics).
 <!-- RESULTS:END -->
-
-## AI assistance
-
-Code in this repository was developed with the help of Claude Code (Anthropic). Commits made with it carry a Co-Authored-By trailer. Each member reviewed, ran and is responsible for the modules they own.
