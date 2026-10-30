@@ -42,6 +42,7 @@ from docx.text.paragraph import Paragraph
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_interim_report as interim  # noqa: E402  (shared helpers: markdown, Cursor, tables, members, PDF)
 
+from har.eval.plots import display_name  # noqa: E402
 from har.utils.paths import REPO_ROOT  # noqa: E402
 
 BuildError = interim.BuildError
@@ -418,11 +419,12 @@ class Resolver:
         return row[name] or None
 
     def analysis(self, arg: str) -> str | None:
-        """``<dotted.key>`` from results/analysis/error_summary.json."""
+        """``<dotted.key>[|<format>]`` from results/analysis/error_summary.json (see ``format_analysis``)."""
+        key, _, spec = (s.strip() for s in arg.partition("|"))
         value: Any = self.data.analysis
-        for key in arg.split("."):
-            value = value[int(key)] if isinstance(value, list) else value[key]
-        return format_scalar(value)
+        for name in key.split("."):
+            value = value[int(name)] if isinstance(value, list) else value[name]
+        return format_analysis(value, spec)
 
     def split(self, arg: str) -> str | None:
         """``<field>`` from configs/split.json."""
@@ -445,7 +447,52 @@ def format_scalar(value: Any) -> str | None:
     return str(value)
 
 
+def format_analysis(value: Any, spec: str = "") -> str | None:
+    """An error_summary.json value, optionally with a format after ``|``.
+
+    ``spec`` is ``.0f`` to ``.3f`` (decimals) or ``%`` (a fraction as a percentage with one decimal):
+    ``0.978|%`` gives ``97.8%``. A ``{"mean", "std"}`` pair prints as ``45.7 ± 5.1`` (``.3f`` without a
+    ``spec``). Without a ``spec`` other values print as ``format_scalar`` does. None for an unknown
+    ``spec`` or a value it cannot format.
+    """
+    if spec == "%":
+        fmt: tuple[str, float, str] | None = (".1f", 100, "%")
+    else:
+        fmt = (spec or ".3f", 1, "") if re.fullmatch(r"(\.[0-3]f)?", spec) else None
+    if fmt is None:
+        return None
+    if isinstance(value, dict) and {"mean", "std"} <= set(value):
+        return format_value(_float(value["mean"]), _float(value["std"]), fmt, None)
+    if not spec:
+        return format_scalar(value)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return format_value(float(value), None, fmt, None)
+
+
 # ---------------------------------------------------------------- docx: page setup and formatting
+
+def column_widths(header: list[str], rows: list[list[str]], total: int) -> list[int]:
+    """Column widths (EMU) that add up to ``total``.
+
+    A column's natural width is its longest cell (the header by its longest word, as headers may
+    wrap) at about half an em per character of the table font, plus the cell padding. If the
+    natural widths fit, they are scaled up to ``total``. Otherwise the columns that fit in an equal
+    share keep their natural width, so short values such as ``212,230`` never break, and the
+    longer columns share the rest in proportion and wrap.
+    """
+    char, pad = Pt(TABLE_PT / 2), Inches(0.2)
+    natural = []
+    for c, title in enumerate(header):
+        longest = max([len(word) for word in title.split()] + [len(row[c]) for row in rows if c < len(row)])
+        natural.append(longest * char + pad)
+    if sum(natural) <= total:
+        return [int(n * total / sum(natural)) for n in natural]
+    share = total / len(natural)
+    fixed = sum(n for n in natural if n <= share)
+    wide = sum(n for n in natural if n > share)
+    return [int(n if n <= share else n * (total - fixed) / wide) for n in natural]
+
 
 def set_outline_level(paragraph: Paragraph, level: int) -> None:
     """Show the heading in Word's navigation pane without using the template's heading styles."""
@@ -568,10 +615,20 @@ class PaperCursor(interim.Cursor):
         return paragraph
 
     def table(self, header: list[str], rows: list[list[str]]) -> Table:
-        """A centred grid table in 8 pt with a bold header row; first column left, others centred."""
+        """A centred grid table in 8 pt with a bold header row; first column left, others centred.
+
+        It spans the text width, with columns sized by ``column_widths``.
+        """
         table = self.doc.add_table(rows=1 + len(rows), cols=len(header))
         self._place(table._tbl)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        table.autofit = False
+        section = self.doc.sections[-1]
+        text_width = section.page_width - section.left_margin - section.right_margin
+        for column, width in zip(table.columns, column_widths(header, rows, text_width)):
+            column.width = width
+            for cell in column.cells:
+                cell.width = width
         set_borders(table)
         for r, values in enumerate([header, *rows]):
             for c, value in enumerate(values):
@@ -742,12 +799,12 @@ class FinalReportBuilder:
 
     def best_model(self) -> str | None:
         """The model with the best mean test macro-F1 (only chooses which confusion matrix to show)."""
-        scored =[(f, m) for m, row in self.data.final.items() if (f := _float(row.get("test_macro_f1_mean"))) is not None]
+        scored = [(f, m) for m, row in self.data.final.items() if (f := _float(row.get("test_macro_f1_mean"))) is not None]
         return max(scored)[1] if scored else None
 
     def final_table(self) -> tuple[list[str], list[list[str]], str]:
         """Table I from results/final_summary.csv: ``(header, rows, note)``."""
-        header =["Model", "Params", "Val Macro-F1", "Test Acc", "Test Macro-F1", "Train time (s)",
+        header = ["Model", "Params", "Val Macro-F1", "Test Acc", "Test Macro-F1", "Train time (s)",
                   "CPU latency (ms)"]
         fields = ["params", "val_macro_f1", "test_acc", "test_macro_f1", "train_time_s", "cpu_latency_bs1_ms"]
         if not self.data.final:
@@ -765,7 +822,7 @@ class FinalReportBuilder:
 
     def tuning_table(self) -> tuple[list[str], list[list[str]], str]:
         """Table II: each model's grid and selected configuration from its tuning_summary.csv."""
-        header =["Model", "Grid", "Selected", "Params", "Val Macro-F1"]
+        header = ["Model", "Grid", "Selected", "Params", "Val Macro-F1"]
         rows = []
         for model, label in self.labels.items():
             if model not in self.data.tuning:
@@ -787,8 +844,9 @@ class FinalReportBuilder:
         return header, rows, note
 
     def per_class_table(self) -> tuple[list[str], list[list[str]], str]:
-        """Table III: test F1 per class (rows) and model (columns) from results/analysis/per_class_f1.csv."""
-        header =["Class"] + list(self.labels.values())
+        """Table III: test F1 per class (rows, ``Walking upstairs``) and model (columns) from
+        results/analysis/per_class_f1.csv."""
+        header = ["Class"] + list(self.labels.values())
         if self.data.per_class is None:
             return header, [], "[MISSING: results/analysis/per_class_f1.csv]"
         try:
@@ -796,15 +854,15 @@ class FinalReportBuilder:
         except (StopIteration, ValueError):
             return header, [], missing(self.inputs, "results/analysis/per_class_f1.csv has an unknown layout "
                                                     "(see report/final/README.md)", "per_class_f1.csv layout")
-        rows = [[name] + [format_value(*cells.get((name, model), (None, None)), (".3f", 1, ""), None) or "n/a"
-                          for model in self.labels] for name in classes]
+        rows = [[display_name(name)] + [format_value(*cells.get((name, model), (None, None)), (".3f", 1, ""), None)
+                                        or "n/a" for model in self.labels] for name in classes]
         return header, rows, ""
 
     # ---- references and C.3
 
     def check_citations(self) -> None:
         """At least 12 references cited overall and at least 10 papers in Section II."""
-        cited =len(self.resolver.cited)
+        cited = len(self.resolver.cited)
         if cited < MIN_REFERENCES:
             self.inputs.problem(f"only {cited} references are cited; Part C needs at least {MIN_REFERENCES}")
         literature = len(self.resolver.cited_in.get(LITERATURE_FILE, set()))
@@ -834,7 +892,7 @@ class FinalReportBuilder:
 
     def contribution(self, member: interim.Member) -> tuple[str, str]:
         """``(model_task, key contributions)`` from report/final/contributions/<member>.md."""
-        rel =FINAL_DIR / "contributions" / f"{member.key}.md"
+        rel = FINAL_DIR / "contributions" / f"{member.key}.md"
         path = self.inputs.path(rel)
         if not path.is_file():
             marker = missing(self.inputs, f"{path} not found (written by {member.name} personally, 6.5)", str(rel))

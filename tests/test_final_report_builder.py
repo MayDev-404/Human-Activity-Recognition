@@ -52,7 +52,9 @@ SPECIAL = {  # extra text per section file, on top of filler words within the bu
     "5_setup.md": "Validation subjects {{split:val_subjects}}; MLP config {{tuning:mlp:config_id}} in {{table:tuning}}.",
     "6a_results.md": ("CNN {{final:cnn1d:test_macro_f1}} (mean {{final:cnn1d:test_macro_f1.mean}}), "
                       "MLP accuracy {{final:mlp:test_acc}}, see {{table:final}} and {{fig:cost_tradeoff}}."),
-    "6b_error_analysis.md": "Total errors {{analysis:errors.total}}, share {{analysis:errors.share}}.",
+    "6b_error_analysis.md": ("Total errors {{analysis:errors.total}}, share {{analysis:errors.share}}. "
+                             "As a percentage {{analysis:errors.share|%}}; all wrong {{analysis:errors.all_wrong|.1f}}, "
+                             "mean {{analysis:errors.all_wrong.mean|.0f}}."),
 }
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
@@ -139,7 +141,8 @@ def dummy_root(tmp_path: Path) -> Path:
             for i, (d, w) in enumerate([(0.1, 8), (0.1, 16), (0.2, 8), (0.2, 16)])])
     _csv(root, "results/analysis/per_class_f1.csv", ["model", "class", "f1_mean", "f1_std"],
          [{"model": m, "class": c, "f1_mean": 0.4, "f1_std": 0.01} for m in MODELS for c in ACTIVITY_NAMES])
-    _write(root, "results/analysis/error_summary.json", json.dumps({"errors": {"total": 12, "share": 0.25}}))
+    _write(root, "results/analysis/error_summary.json", json.dumps(
+        {"errors": {"total": 12, "share": 0.25, "all_wrong": {"mean": 45.6667, "std": 5.1316}}}))
     for rel in ("docs/figures/class_distribution.png", "results/figures/final_val_curves.png",
                 "results/figures/cost_tradeoff.png", "results/analysis/per_class_f1.png",
                 "results/analysis/error_overlap.png", "results/figures/confusion_test_cnn1d_final.png"):
@@ -190,6 +193,18 @@ def test_format_value() -> None:
     assert builder.format_value(0.9412, 0.0041, acc, "std") == "0.4%"
     assert builder.format_value(1.25, None, f1, None) == "1.250"   # single-process latency has no std
     assert builder.format_value(None, None, f1, None) is None
+
+
+def test_format_analysis() -> None:
+    pair = {"mean": 45.6667, "std": 5.1316}
+    assert builder.format_analysis(0.978, "%") == "97.8%"
+    assert builder.format_analysis(0.35612, ".2f") == "0.36"
+    assert builder.format_analysis(pair, ".1f") == "45.7 ± 5.1"
+    assert builder.format_analysis(pair) == "45.667 ± 5.132"
+    assert builder.format_analysis({"mean": 0.5, "std": None}, "%") == "50.0%"   # one seed: no std
+    assert builder.format_analysis(12) == "12" and builder.format_analysis([3, 15]) == "3, 15"
+    for value, spec in ((0.25, "pct"), (0.25, ".4f"), ("SITTING", ".1f"), ({"a": 1}, "")):
+        assert builder.format_analysis(value, spec) is None
 
 
 def test_word_count_ignores_citations_and_counts_placeholders_once() -> None:
@@ -285,7 +300,7 @@ def test_placeholders_are_resolved(dummy_root: Path) -> None:
     text = _all_text(Document(str(_build(dummy_root))))
     assert "CNN 0.533 ± 0.004 (mean 0.533), MLP accuracy 61.2 ± 0.3%, see Table I and Fig. 3." in text
     assert "Validation subjects 3, 15, 19, 22, 28, 29; MLP config c2 in Table II." in text
-    assert "Total errors 12, share 0.250." in text
+    assert "Total errors 12, share 0.250. As a percentage 25.0%; all wrong 45.7 ± 5.1, mean 46." in text
     assert "{{" not in text and "[@" not in text and "MISSING" not in text
 
 
@@ -299,8 +314,29 @@ def test_generated_tables(dummy_root: Path) -> None:
     assert tuning[1] == ["MLP (features)", "dropout {0.1, 0.2} × width {8, 16}", "c2: dropout 0.1, width 16",
                          "200", "0.510"]
     assert per_class[0] == ["Class"] + list(LABELS.values())
-    assert [r[0] for r in per_class[1:]] == ACTIVITY_NAMES and per_class[1][1] == "0.400 ± 0.010"
+    assert [r[0] for r in per_class[1:]] == ["Walking", "Walking upstairs", "Walking downstairs", "Sitting",
+                                             "Standing", "Laying"]
+    assert per_class[1][1] == "0.400 ± 0.010"
     assert "CPU latency at batch size 1 on one thread: profile_dummy.csv (single process)." in _all_text(doc)
+    # columns are sized by their content: the tuning grid column is wider than the params column
+    widths = [col.width for col in doc.tables[1].columns]
+    assert widths[1] > widths[3] and sum(widths) == pytest.approx(sum(col.width for col in doc.tables[0].columns),
+                                                                   abs=10)
+
+
+def test_column_widths() -> None:
+    inch = builder.Inches(1)
+    # natural widths fit: scaled up in proportion to the total
+    short = builder.column_widths(["Model", "Params"], [["MLP", "212,230"]], 6 * inch)
+    assert sum(short) == pytest.approx(6 * inch, abs=2) and short[1] > short[0]
+    # too wide: short columns keep their natural width, the long one takes the rest and wraps
+    header = ["Model", "Grid", "Params", "Val Macro-F1"]
+    rows = [["MLP (features)", "dropout {0.3, 0.5} × hidden {[256, 128], [256, 256]} × width {8, 16, 32}",
+             "212,230", "0.963"]]
+    widths = builder.column_widths(header, rows, 4 * inch)
+    natural_params = 7 * builder.Pt(builder.TABLE_PT / 2) + builder.Inches(0.2)
+    assert widths[2] == natural_params and widths[1] > widths[0] > widths[3]
+    assert sum(widths) == pytest.approx(4 * inch, abs=4)
 
 
 def test_contribution_page_is_last_with_the_c3_table(dummy_root: Path) -> None:
@@ -408,6 +444,14 @@ def test_committed_meta_has_no_placeholders() -> None:
 
 
 def test_draft_build_of_the_repository_runs(tmp_path: Path) -> None:
-    """The repository builds as a draft at any stage; missing inputs become [MISSING: ...] markers."""
-    path = builder.main(["--draft", "--no-pdf", "--out-dir", str(tmp_path)])
+    """The repository builds as a draft at any stage; missing inputs become [MISSING: ...] markers.
+
+    What is already committed must be correct, though: every placeholder and citation in the committed
+    section and contribution files resolves against the committed results, with no em dash or table.
+    """
+    inputs = builder.Inputs(root=REPO_ROOT, draft=True)
+    path, _ = builder.build(inputs, builder.TEMPLATE, tmp_path, make_pdf=False)
     assert path.is_file() and path.name == "ICT4442_Final_Report_HAR_DRAFT.docx"
+    broken = [p for p in inputs.problems
+              if any(s in p for s in ("cannot resolve", "unknown citation key", "em dash", "markdown table"))]
+    assert broken == []
