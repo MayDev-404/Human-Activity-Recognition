@@ -20,6 +20,6 @@ Turns (PHASE3_SPEC section 7): F1.1 and F1.2 in T1; F1.3 and the start of F1.4 i
 | F1.1 | Phase 3 setup and hygiene | Done | mayank/phase3-setup |
 | F1.2 | References | Done | mayank/references |
 | F1.3 | Tuning and final runs: MLP and Transformer | Done | mayank/final-runs |
-| F1.4 | Part C builder | In progress | mayank/final-builder |
-| F1.5 | M1 sections and own contribution statement | Todo | mayank/final-sections |
+| F1.4 | Part C builder | Done | mayank/final-builder, mayank/final-sections |
+| F1.5 | M1 sections and own contribution statement | In progress (sections done; contribution statement to write) | mayank/final-sections |
 | F1.6 | Final build, tag, submit | Todo | |
