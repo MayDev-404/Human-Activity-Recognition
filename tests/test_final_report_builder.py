@@ -318,6 +318,25 @@ def test_generated_tables(dummy_root: Path) -> None:
                                              "Standing", "Laying"]
     assert per_class[1][1] == "0.400 ± 0.010"
     assert "CPU latency at batch size 1 on one thread: profile_dummy.csv (single process)." in _all_text(doc)
+    # columns are sized by their content: the tuning grid column is wider than the params column
+    widths = [col.width for col in doc.tables[1].columns]
+    assert widths[1] > widths[3] and sum(widths) == pytest.approx(sum(col.width for col in doc.tables[0].columns),
+                                                                   abs=10)
+
+
+def test_column_widths() -> None:
+    inch = builder.Inches(1)
+    # natural widths fit: scaled up in proportion to the total
+    short = builder.column_widths(["Model", "Params"], [["MLP", "212,230"]], 6 * inch)
+    assert sum(short) == pytest.approx(6 * inch, abs=2) and short[1] > short[0]
+    # too wide: short columns keep their natural width, the long one takes the rest and wraps
+    header = ["Model", "Grid", "Params", "Val Macro-F1"]
+    rows = [["MLP (features)", "dropout {0.3, 0.5} × hidden {[256, 128], [256, 256]} × width {8, 16, 32}",
+             "212,230", "0.963"]]
+    widths = builder.column_widths(header, rows, 4 * inch)
+    natural_params = 7 * builder.Pt(builder.TABLE_PT / 2) + builder.Inches(0.2)
+    assert widths[2] == natural_params and widths[1] > widths[0] > widths[3]
+    assert sum(widths) == pytest.approx(4 * inch, abs=4)
 
 
 def test_contribution_page_is_last_with_the_c3_table(dummy_root: Path) -> None:

@@ -472,6 +472,28 @@ def format_analysis(value: Any, spec: str = "") -> str | None:
 
 # ---------------------------------------------------------------- docx: page setup and formatting
 
+def column_widths(header: list[str], rows: list[list[str]], total: int) -> list[int]:
+    """Column widths (EMU) that add up to ``total``.
+
+    A column's natural width is its longest cell (the header by its longest word, as headers may
+    wrap) at about half an em per character of the table font, plus the cell padding. If the
+    natural widths fit, they are scaled up to ``total``. Otherwise the columns that fit in an equal
+    share keep their natural width, so short values such as ``212,230`` never break, and the
+    longer columns share the rest in proportion and wrap.
+    """
+    char, pad = Pt(TABLE_PT / 2), Inches(0.2)
+    natural = []
+    for c, title in enumerate(header):
+        longest = max([len(word) for word in title.split()] + [len(row[c]) for row in rows if c < len(row)])
+        natural.append(longest * char + pad)
+    if sum(natural) <= total:
+        return [int(n * total / sum(natural)) for n in natural]
+    share = total / len(natural)
+    fixed = sum(n for n in natural if n <= share)
+    wide = sum(n for n in natural if n > share)
+    return [int(n if n <= share else n * (total - fixed) / wide) for n in natural]
+
+
 def set_outline_level(paragraph: Paragraph, level: int) -> None:
     """Show the heading in Word's navigation pane without using the template's heading styles."""
     lvl = OxmlElement("w:outlineLvl")
@@ -593,10 +615,20 @@ class PaperCursor(interim.Cursor):
         return paragraph
 
     def table(self, header: list[str], rows: list[list[str]]) -> Table:
-        """A centred grid table in 8 pt with a bold header row; first column left, others centred."""
+        """A centred grid table in 8 pt with a bold header row; first column left, others centred.
+
+        It spans the text width, with columns sized by ``column_widths``.
+        """
         table = self.doc.add_table(rows=1 + len(rows), cols=len(header))
         self._place(table._tbl)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        table.autofit = False
+        section = self.doc.sections[-1]
+        text_width = section.page_width - section.left_margin - section.right_margin
+        for column, width in zip(table.columns, column_widths(header, rows, text_width)):
+            column.width = width
+            for cell in column.cells:
+                cell.width = width
         set_borders(table)
         for r, values in enumerate([header, *rows]):
             for c, value in enumerate(values):
