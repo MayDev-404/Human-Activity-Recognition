@@ -22,4 +22,4 @@ Turns (PHASE3_SPEC section 7): F2.1 in T2; F2.2 and F2.3 in T5; F2.4 in T8. The 
 | F2.1 | Harness changes for Phase 3 (seeds, tuning runner, predictions, final aggregation) | Done | ishan/phase3-harness |
 | F2.2 | Tuning and final runs: 1D-CNN | Done | ishan/final-runs |
 | F2.3 | Final table, same-machine profiling, results figures | Done | ishan/final-runs (one PR with F2.2) |
-| F2.4 | M2 sections and own contribution statement | In progress (sections done; contribution statement to write) | ishan/final-sections |
+| F2.4 | M2 sections and own contribution statement | Done | ishan/final-sections, ishan/contribution |
