@@ -25,4 +25,4 @@ Turns (PHASE3_SPEC section 7): F3.1 in T3; F3.2 and F3.3 in T6; F3.4 in T9; F3.5
 | F3.2 | Error analysis | Done | addyan/error-analysis |
 | F3.3 | GRU latency check | Done | addyan/error-analysis |
 | F3.4 | M3 sections and own contribution statement | Done | addyan/final-sections, addyan/contribution |
-| F3.5 | Final contribution log | Todo | |
+| F3.5 | Final contribution log | Done | addyan/contribution-log |
