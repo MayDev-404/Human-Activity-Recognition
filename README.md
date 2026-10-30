@@ -66,6 +66,14 @@ python scripts/train.py --config configs/mlp.yaml            # full run, written
 python scripts/make_results_table.py                         # results/summary.csv, results/summary.md and the block below
 ```
 
+### Live demo
+
+```bash
+streamlit run scripts/demo_app.py
+```
+
+Opens a local web app (http://localhost:8501) with four tabs: a live demo that classifies any window from the 9 test subjects with the seed-42 final checkpoint of every model, the final results table and figures, the error analysis, and a summary of the method. A live check reruns each checkpoint on the whole test split and compares the outcome with its run folder. The checkpoints (`best.pt`) are gitignored, so the app runs only on the machine that trained the final runs.
+
 Protocol, shared by every model and stored only in `configs/base.yaml`: Adam (lr 1e-3), batch size 64, cross-entropy loss, at most 50 epochs with early stopping on validation macro-F1 (patience 10, best weights restored), gradient clipping at norm 1.0, seed 42, augmentation off. Add `--no-test` while debugging. Models and runs are selected on the validation split only; the test split is evaluated once, on the selected checkpoint.
 
 ## Results
