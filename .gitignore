@@ -39,6 +39,10 @@ Thumbs.db
 results/_smoke/
 *.local.yaml
 report/build/
+# Kept locally, not in the repository
+/docs/
+/report/
+/CLAUDE.md
 
 # Synopsis PDF (contains registration numbers; kept out of the public repo)
 ICT4442_Synopsis_HAR.pdf
